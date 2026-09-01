@@ -7,11 +7,11 @@
 
 ## One-liner
 
-Record a polished demo GIF of your web app by clicking through it once.
+Record a polished demo of your web app by clicking through it once.
 
 ## Problem
 
-Every project needs a demo GIF. Hackathon submissions, README files, pull
+Every project needs a demo animation. Hackathon submissions, README files, pull
 request descriptions, portfolios, Product Hunt launches. It is the single
 highest-leverage asset a project has, and producing one today is miserable:
 
@@ -41,13 +41,13 @@ Three tiers, and a user can stop at any of them:
 | tier | command | who it is for |
 |------|---------|---------------|
 | 0 | `npx flowreel` | first-timers — detects a dev server or an existing script and guides from there |
-| 1 | `flowreel record` | most people — click through the app, get a GIF and a generated script |
+| 1 | `flowreel record` | most people — click through the app, get a demo and a generated script |
 | 2 | edit the `.reel` file, re-run, wire into CI | maintainers who want regenerable demos |
 
 ## `flowreel record` — the headline feature
 
 Opens the app in a browser. The user clicks, types and scrolls exactly as a
-human would. On exit, flowreel writes both the finished GIF and the `.reel`
+human would. On exit, flowreel writes both the finished demo and the `.reel`
 script that reproduces it.
 
 This removes the DSL from the critical path entirely. Playwright already
@@ -89,7 +89,7 @@ output demo.gif --preset github-readme
 | `highlight <target>` | |
 | `caption "<text>"` | burned-in overlay text |
 | `theme <light\|dark>` | |
-| `output <file> [--preset <name>]` | `.gif`, `.mp4`, `.webm` |
+| `output <file> [--preset <name>]` | `.webp`, `.gif`, `.mp4`, `.webm` |
 
 ### Plain-English targets
 
@@ -106,9 +106,9 @@ What earns a star is what comes out the other end:
   ripples and keystroke chips. Never a real mouse capture.
 - **Auto-zoom** onto the active element so a 1440p app is legible at README width
 - **Dead-time trimming** — idle gaps over a threshold are collapsed automatically
-- **Captions** burned in, turning a silent GIF into an explainer
+- **Captions** burned in, turning a silent clip into an explainer
 - **Framing** — browser chrome, device frames, rounded corners, drop shadow, gradient backdrop
-- **Size targeting** — palette-optimized GIF encoding that hits a byte budget
+- **Size targeting** — encoding that hits a byte budget for the chosen destination
 
 ### Key technical decision: overlays are injected, not composited
 
@@ -119,23 +119,51 @@ There is no frame-by-frame compositing step. This is dramatically less code,
 pixel-accurate by construction, resolution-independent, and is the single reason
 this project is finishable by one person.
 
-## Presets
+## Output formats: why GIF is the default, and why it should not be forever
 
-Getting a GIF under a README size limit by hand is genuinely annoying, so the
-tool does it:
+GIF is a bad format. 256 colors, no interframe compression, files routinely
+5-10x larger than an equivalent H.264 encode. It is the default for exactly one
+reason: **it is the only format that reliably autoplays inline in a GitHub
+README from a repo-relative path.**
 
-| preset | output | target |
-|--------|--------|--------|
-| `github-readme` | GIF, 900px wide, 15fps, looped | under 5MB |
-| `twitter` | MP4, 1280x720 | under 15MB |
-| `producthunt` | GIF, 1270px wide | under 3MB |
+The alternatives fail on that specific constraint:
 
-Presets set width, framerate and byte budget together. The encoder reduces
-framerate and palette size until the budget is met, then reports the final size.
+- **MP4 / WebM.** GitHub markdown does not accept relative paths for video. The
+  file must be uploaded through GitHub's web editor and is stored outside the
+  repository, with no autoplay and no looping. This also breaks CI
+  regeneration outright, since a build step cannot update a file that does not
+  live in the repo. Fine for docs sites and social, unusable for a README.
+- **Animated WebP.** Roughly 3.5x smaller than GIF at equivalent quality
+  (~2.3MB versus ~8.2MB for a 720p clip) with full color instead of 256, and it
+  appears to render inline on GitHub.
+- **AVIF.** Around 15x smaller than GIF, but rendering support is less certain.
+
+**Open question, resolved in milestone 1.** Sources conflict on whether GitHub
+reliably renders animated WebP inline. This is a cheap empirical test: publish
+a WebP, a GIF and an AVIF to a scratch repo and check rendering on the GitHub
+web UI, the GitHub mobile app, and the npm package page. If WebP passes,
+`github-readme` defaults to WebP with a GIF fallback flag. If it fails, GIF
+stays the default. This must not be guessed at.
+
+### Presets are keyed by destination, not format
+
+The user should say where the demo is going, not what codec it needs:
+
+| preset | format | dimensions | target size |
+|--------|--------|-----------|-------------|
+| `github-readme` | WebP or GIF, pending the test above | 900px wide, 15fps, looped | under 5MB |
+| `docs` | WebM with MP4 fallback | 1280px wide | under 10MB |
+| `twitter` | MP4 | 1280x720 | under 15MB |
+| `producthunt` | GIF | 1270px wide | under 3MB |
+
+Presets set format, width, framerate and byte budget together. The encoder
+reduces framerate and palette size until the budget is met, then reports the
+final size.
 
 A preset may be named in the script's `output` line or passed as a CLI flag.
 The CLI flag wins, so a checked-in script can be re-rendered for a different
-target without editing the file.
+destination without editing the file. `output demo.gif` with an explicit
+extension always overrides the preset's format choice.
 
 ## Zero-flag defaults
 
@@ -146,7 +174,8 @@ Running `flowreel` with no arguments must never produce a usage error. It:
 3. If a server is found, offers to start recording
 4. If nothing is found, prints one sentence explaining what to do next
 
-Defaults: `github-readme` preset, output named `demo.gif`, dead time trimmed,
+Defaults: `github-readme` preset, output named `demo` with the preset's
+extension, dead time trimmed,
 zoom automatic. Flags exist for people who want control, not as a requirement.
 
 ## Error handling
@@ -172,7 +201,7 @@ screencast pulls frames, `ffmpeg-static` encodes.
 | `runtime/` | executes a `Script` against a Playwright page | against a bundled demo app |
 | `overlay/` | injected cursor, ripples, captions, zoom | browser-side CSS/DOM, snapshot tested |
 | `capture/` | CDP screencast to a frame sequence | frame count and dimensions |
-| `encode/` | frames to GIF/MP4/WebM, presets, byte budgeting | size and dimension assertions |
+| `encode/` | frames to WebP/GIF/MP4/WebM, presets, byte budgeting | size and dimension assertions |
 | `record/` | live session to generated `.reel` source | interaction log to script, pure |
 | `cli/` | flags, zero-arg flow, error presentation | snapshot tested |
 
@@ -206,8 +235,8 @@ Vitest.
 ## Distribution
 
 - npm, primary path `npx flowreel`
-- `action.yml` makes the repo a GitHub Action that regenerates demo GIFs on release, so READMEs never show a stale UI
-- README with a demo GIF that is itself produced by flowreel, checked in CI
+- `action.yml` makes the repo a GitHub Action that regenerates demos on release, so READMEs never show a stale UI
+- README with a demo that is itself produced by flowreel, checked in CI
 
 The self-demonstrating README is a deliberate launch asset. The product proves
 itself in the first two seconds of the page.
@@ -218,7 +247,7 @@ itself in the first two seconds of the page.
 |------|------------|
 | Chromium download kills first-run experience | Prefer system Chrome/Edge; prompt with size before downloading |
 | Output looks amateur, defeating the whole point | The polish layer is the product; treat visual quality as a v1 requirement, not a nicety |
-| GIF file sizes exceed README limits | Byte-budgeted encoder that degrades framerate and palette until it fits |
+| Output file sizes exceed README limits | Byte-budgeted encoder that degrades framerate and palette until it fits; WebP preferred over GIF if it renders |
 | Recorded selectors are brittle | Prefer visible text and ARIA roles over CSS paths when generating scripts |
 | Scope creep into a video editor | Non-goals are explicit; no GUI, no timeline, no audio in v1 |
 
@@ -232,9 +261,9 @@ itself in the first two seconds of the page.
 
 ## Milestones
 
-1. Skeleton, `.reel` parser, golden-file harness, browser resolution and the Chromium decision
+1. Skeleton, `.reel` parser, golden-file harness, browser resolution and the Chromium decision, and the WebP-on-GitHub rendering test that sets the default output format
 2. Runtime and capture: script executes, frames come out
-3. Encoder with presets and byte budgeting — end to end GIF from a hand-written script
+3. Encoder with presets and byte budgeting — end to end output from a hand-written script
 4. Overlay layer: cursor, ripples, captions, zoom, framing
 5. `flowreel record` and script generation
 6. Zero-arg flow, friendly errors, `--watch`
