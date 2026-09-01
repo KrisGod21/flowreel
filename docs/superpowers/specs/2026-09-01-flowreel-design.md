@@ -70,7 +70,7 @@ caption "One command, zero setup"
 zoom "#dashboard"
 scroll down
 
-output demo.gif --preset github-readme
+output demo
 ```
 
 ### Commands in v1
@@ -89,7 +89,7 @@ output demo.gif --preset github-readme
 | `highlight <target>` | |
 | `caption "<text>"` | burned-in overlay text |
 | `theme <light\|dark>` | |
-| `output <file> [--preset <name>]` | `.webp`, `.gif`, `.mp4`, `.webm` |
+| `output <name> [--preset <name>]` | no extension emits the whole bundle; an explicit `.webp`/`.gif`/`.mp4`/`.webm` emits just that one |
 
 ### Plain-English targets
 
@@ -119,10 +119,13 @@ There is no frame-by-frame compositing step. This is dramatically less code,
 pixel-accurate by construction, resolution-independent, and is the single reason
 this project is finishable by one person.
 
-## Output formats: why GIF is the default, and why it should not be forever
+## Output formats
+
+A run emits an image for the README and a video for everywhere else. The image
+is the constrained half, so it drives the format discussion.
 
 GIF is a bad format. 256 colors, no interframe compression, files routinely
-5-10x larger than an equivalent H.264 encode. It is the default for exactly one
+5-10x larger than an equivalent H.264 encode. It survives for exactly one
 reason: **it is the only format that reliably autoplays inline in a GitHub
 README from a repo-relative path.**
 
@@ -145,16 +148,52 @@ web UI, the GitHub mobile app, and the npm package page. If WebP passes,
 `github-readme` defaults to WebP with a GIF fallback flag. If it fails, GIF
 stays the default. This must not be guessed at.
 
+### Render once, emit many
+
+**The user records once and gets every format they need.** Asking someone to
+re-record for a video after they already made an image is exactly the kind of
+effort this tool exists to remove.
+
+This is close to free. The expensive work — launching a browser, driving the
+script, capturing frames — happens a single time. Encoding that same frame set
+to a second format is a few seconds of ffmpeg, and the outputs are produced in
+parallel.
+
+Two rules make it work:
+
+1. **Capture at native resolution, downscale per output.** Frames are captured
+   once at full viewport resolution and each output downscales from that
+   master. A 900px README image and a 1280px MP4 come from the same source with
+   no quality loss and no second run.
+2. **`output` with no extension emits the bundle.** `output demo` produces
+   `demo.webp` and `demo.mp4`. Naming an explicit extension opts out and
+   produces only that file.
+
+The run ends with a copy-pasteable summary, so the last step takes no thought
+either:
+
+```
+  demo.webp   1.8 MB   README, GitHub, npm
+  demo.mp4    740 KB   X, docs sites, Product Hunt
+
+  Paste into your README:
+  ![demo](demo.webp)
+```
+
 ### Presets are keyed by destination, not format
 
 The user should say where the demo is going, not what codec it needs:
 
-| preset | format | dimensions | target size |
-|--------|--------|-----------|-------------|
+| preset | emits | dimensions | target size |
+|--------|-------|-----------|-------------|
+| `default` | **both**: a README image *and* an MP4 | 900px image, 1280px video | under 5MB / under 10MB |
 | `github-readme` | WebP or GIF, pending the test above | 900px wide, 15fps, looped | under 5MB |
 | `docs` | WebM with MP4 fallback | 1280px wide | under 10MB |
 | `twitter` | MP4 | 1280x720 | under 15MB |
 | `producthunt` | GIF | 1270px wide | under 3MB |
+
+`default` is what runs when the user says nothing, because the two artifacts
+almost everyone needs are a README image and a shareable video.
 
 Presets set format, width, framerate and byte budget together. The encoder
 reduces framerate and palette size until the budget is met, then reports the
@@ -174,8 +213,8 @@ Running `flowreel` with no arguments must never produce a usage error. It:
 3. If a server is found, offers to start recording
 4. If nothing is found, prints one sentence explaining what to do next
 
-Defaults: `github-readme` preset, output named `demo` with the preset's
-extension, dead time trimmed,
+Defaults: the `default` preset, which emits both a README image and an MP4
+named `demo`, dead time trimmed,
 zoom automatic. Flags exist for people who want control, not as a requirement.
 
 ## Error handling
@@ -201,7 +240,7 @@ screencast pulls frames, `ffmpeg-static` encodes.
 | `runtime/` | executes a `Script` against a Playwright page | against a bundled demo app |
 | `overlay/` | injected cursor, ripples, captions, zoom | browser-side CSS/DOM, snapshot tested |
 | `capture/` | CDP screencast to a frame sequence | frame count and dimensions |
-| `encode/` | frames to WebP/GIF/MP4/WebM, presets, byte budgeting | size and dimension assertions |
+| `encode/` | one frame set to many outputs in parallel, presets, byte budgeting | size and dimension assertions |
 | `record/` | live session to generated `.reel` source | interaction log to script, pure |
 | `cli/` | flags, zero-arg flow, error presentation | snapshot tested |
 
@@ -263,7 +302,7 @@ itself in the first two seconds of the page.
 
 1. Skeleton, `.reel` parser, golden-file harness, browser resolution and the Chromium decision, and the WebP-on-GitHub rendering test that sets the default output format
 2. Runtime and capture: script executes, frames come out
-3. Encoder with presets and byte budgeting — end to end output from a hand-written script
+3. Encoder with presets, byte budgeting and parallel multi-format emit — end to end output from a hand-written script
 4. Overlay layer: cursor, ripples, captions, zoom, framing
 5. `flowreel record` and script generation
 6. Zero-arg flow, friendly errors, `--watch`
