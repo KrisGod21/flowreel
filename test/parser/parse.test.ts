@@ -81,4 +81,16 @@ describe('parse', () => {
   it('rejects an unknown theme', () => {
     expect(() => parse('theme neon')).toThrow(/light.*dark/i);
   });
+
+  it('reports an unterminated quote as a parse error with the right line', () => {
+    let err: unknown;
+    try {
+      parse('visit http://x\nclick "Sign in');
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(ReelParseError);
+    expect((err as ReelParseError).line).toBe(2);
+    expect((err as ReelParseError).message).toMatch(/unterminated/i);
+  });
 });
