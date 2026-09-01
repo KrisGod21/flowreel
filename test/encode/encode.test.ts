@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { mkdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { encodeOutput } from '../../src/encode/encode.js';
-import { probeFfmpeg } from '../../src/encode/probe.js';
+import { encodeOutput, assertSupported } from '../../src/encode/encode.js';
+import { probeFfmpeg, type FfmpegCapabilities } from '../../src/encode/probe.js';
 import type { Frame } from '../../src/capture/types.js';
 
 // Scratch stays inside the repo so nothing is written off the D: drive.
@@ -60,21 +60,6 @@ describe('encodeOutput', () => {
     expect(result.bytes).toBeGreaterThan(0);
   });
 
-  it('reports a friendly error when the format is unsupported by this build', async () => {
-    const caps = await probeFfmpeg();
-    // If this build can do webm there is no missing-encoder path to exercise.
-    if (caps.vp9) return;
-
-    await expect(
-      encodeOutput(frames(3, 15), {
-        format: 'webm',
-        width: 320,
-        fps: 15,
-        maxBytes: 10_000_000,
-      }, resolve(SCRATCH, 'tiny.webm')),
-    ).rejects.toThrow(/no webm encoder/i);
-  });
-
   it('returns the file even when the byte budget cannot be met', async () => {
     const caps = await probeFfmpeg();
     if (!caps.gif) return;
@@ -89,5 +74,23 @@ describe('encodeOutput', () => {
 
     // A valid file that missed its budget is reported, not thrown away.
     expect(result.bytes).toBeGreaterThan(1);
+    expect((await stat(out)).size).toBe(result.bytes);
+  });
+});
+
+describe('assertSupported', () => {
+  // A fabricated capabilities object, not this machine's real ffmpeg probe —
+  // ffmpeg-static ships the same prebuilt binary to every install, which
+  // means every format here is available on essentially every machine and in
+  // CI. A test of the missing-encoder path must not depend on this build
+  // actually lacking an encoder, or it silently asserts nothing everywhere.
+  const caps: FfmpegCapabilities = { h264: true, webp: true, gif: true, vp9: false };
+
+  it('throws a friendly error for a format this build cannot encode', () => {
+    expect(() => assertSupported(caps, 'webm')).toThrow(/no webm encoder/i);
+  });
+
+  it('does not throw for a format this build can encode', () => {
+    expect(() => assertSupported(caps, 'gif')).not.toThrow();
   });
 });

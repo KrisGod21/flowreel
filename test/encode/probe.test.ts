@@ -29,4 +29,11 @@ describe('parseEncoders', () => {
   it('does not mistake a substring for an encoder', () => {
     expect(parseEncoders(' V....D libx264rgb  something\n').h264).toBe(false);
   });
+
+  it('reports webp as unsupported when only the static (non-animated) encoder is present', () => {
+    // flowreel only ever needs animated webp. A build with just the static
+    // libwebp encoder cannot produce that, so `webp` must stay false here
+    // even though ffmpeg does list a webp-family encoder.
+    expect(parseEncoders(' V....D libwebp              libwebp WebP image (codec webp)\n').webp).toBe(false);
+  });
 });

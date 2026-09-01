@@ -26,7 +26,12 @@ function hasEncoder(output: string, name: string): boolean {
 export function parseEncoders(output: string): FfmpegCapabilities {
   return {
     h264: hasEncoder(output, 'libx264'),
-    webp: hasEncoder(output, 'libwebp_anim') || hasEncoder(output, 'libwebp'),
+    // flowreel only ever emits *animated* webp (the README motion format), so
+    // `webp` here means specifically that libwebp_anim is present. The plain,
+    // static-only `libwebp` encoder can't produce what this tool needs, and
+    // reporting it as support would let a caller pass the pre-encode check and
+    // then have ffmpeg reject an unrecognized/unusable codec name.
+    webp: hasEncoder(output, 'libwebp_anim'),
     gif: hasEncoder(output, 'gif'),
     vp9: hasEncoder(output, 'libvpx-vp9'),
   };

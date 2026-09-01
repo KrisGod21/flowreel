@@ -5,19 +5,29 @@ import { dirname, resolve } from 'node:path';
 import type { Frame } from '../capture/types.js';
 import { ffmpegBinary, probeFfmpeg, type FfmpegCapabilities } from './probe.js';
 import { resampleToFps } from '../capture/trim.js';
-import { degrade } from './budget.js';
-import type { OutputSpec } from './presets.js';
+import { degrade, MAX_ATTEMPTS } from './budget.js';
+import type { OutputFormat, OutputSpec } from './presets.js';
 
 const run = promisify(execFile);
 
-const MAX_ATTEMPTS = 7;
-
-function supports(caps: FfmpegCapabilities, format: OutputSpec['format']): boolean {
+function supports(caps: FfmpegCapabilities, format: OutputFormat): boolean {
   switch (format) {
     case 'gif': return caps.gif;
     case 'webp': return caps.webp;
     case 'mp4': return caps.h264;
     case 'webm': return caps.vp9;
+  }
+}
+
+// Pulled out as its own pure function so the friendly-error path can be
+// tested deterministically against a fabricated FfmpegCapabilities object,
+// rather than depending on this machine's actual ffmpeg build happening to
+// lack an encoder.
+export function assertSupported(caps: FfmpegCapabilities, format: OutputFormat): void {
+  if (!supports(caps, format)) {
+    throw new Error(
+      `This ffmpeg build has no ${format} encoder, so I couldn't get a ${format} out of it. Try a different --preset.`,
+    );
   }
 }
 
@@ -57,11 +67,7 @@ export async function encodeOutput(
   outPath: string,
 ): Promise<{ path: string; bytes: number }> {
   const caps = await probeFfmpeg();
-  if (!supports(caps, spec.format)) {
-    throw new Error(
-      `This ffmpeg build has no ${spec.format} encoder, so I couldn't get a ${spec.format} out of it. Try a different --preset.`,
-    );
-  }
+  assertSupported(caps, spec.format);
 
   const scratch = resolve(dirname(outPath), '.flowreel-frames');
   let current: OutputSpec | null = spec;
