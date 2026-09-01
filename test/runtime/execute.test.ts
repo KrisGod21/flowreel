@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { resolveBrowser, launchOptionsFor, systemProbe } from '../../src/browser/resolve.js';
 import { executeScript, TargetNotFoundError } from '../../src/runtime/execute.js';
+import { resolveTarget } from '../../src/runtime/targets.js';
 import { startScreencast } from '../../src/capture/screencast.js';
 import { parse } from '../../src/parser/parse.js';
 
@@ -33,6 +34,14 @@ describe('executeScript', () => {
     expect(await page.locator('#email').inputValue()).toBe('demo@example.com');
   });
 
+  it('resolves a CSS-selector target to the visible match, not a hidden decoy that matches first', async () => {
+    await page.goto(FIXTURE);
+    // .cta matches both #hidden-cta (display: none, first in document order) and
+    // #signin (visible). A presence-only resolver would return the hidden one.
+    const locator = await resolveTarget(page, '.cta');
+    expect(await locator.getAttribute('id')).toBe('signin');
+  });
+
   it('names the visible buttons when a target is not found', async () => {
     await page.goto(FIXTURE);
     let err: unknown;
@@ -45,6 +54,7 @@ describe('executeScript', () => {
     expect((err as Error).message).toContain('Log out');
     expect((err as Error).message).toContain('Sign in');
     expect((err as Error).message).toContain('Register');
+    expect((err as Error).message).not.toContain('Hidden decoy');
   });
 });
 

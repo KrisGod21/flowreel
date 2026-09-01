@@ -12,7 +12,11 @@
   <body>
     <h1>Fixture App</h1>
     <input id="email" placeholder="Email" />
-    <button id="signin">Sign in</button>
+    <!-- Hidden decoy: shares a class with #signin so a CSS-selector target ("`.cta`")
+         matches both. It comes first in document order, so a resolver that only
+         checks presence (not visibility) would pick this one instead of #signin. -->
+    <button id="hidden-cta" class="cta" style="display: none">Hidden decoy</button>
+    <button id="signin" class="cta">Sign in</button>
     <button id="register">Register</button>
     <div id="dashboard">Dashboard</div>
     <script>

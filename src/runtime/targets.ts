@@ -11,6 +11,9 @@ export class TargetNotFoundError extends Error {
 async function visibleButtonNames(page: Page): Promise<string[]> {
   return page.evaluate(() =>
     Array.from(document.querySelectorAll('button, [role="button"], a'))
+      .filter((el) =>
+        'checkVisibility' in el ? (el as Element & { checkVisibility(): boolean }).checkVisibility() : (el as HTMLElement).offsetParent !== null,
+      )
       .map((el) => (el.textContent ?? '').trim())
       .filter((text) => text.length > 0)
       .slice(0, 8),
@@ -26,7 +29,8 @@ export async function resolveTarget(page: Page, target: string): Promise<Locator
 
   for (const candidate of candidates) {
     try {
-      if ((await candidate.count()) > 0) return candidate.first();
+      const visible = candidate.filter({ visible: true });
+      if ((await visible.count()) > 0) return visible.first();
     } catch {
       // An invalid CSS selector is not an error here; try the next strategy.
     }
