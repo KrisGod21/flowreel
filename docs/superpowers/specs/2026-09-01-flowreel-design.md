@@ -25,6 +25,21 @@ highest-leverage asset a project has, and producing one today is miserable:
 stars doing it. Nothing equivalent exists for web apps. The closest tool,
 `screencli`, sits at 10 stars, so the lane is validated and unclaimed.
 
+## Positioning
+
+**The flagship is the README animation.** That is the artifact people search
+for, the reason they arrive, and what the landing GIF on our own README shows.
+The headline stays "a demo animation for your README, from one click-through."
+
+**Video is a first-class feature, not a bolt-on.** It shares the same capture,
+the same polish layer, and the same quality bar. It is second only in the
+marketing story, never in the engineering. Every run emits both by default, and
+an MP4 that looks worse than the GIF is a bug, not a tradeoff.
+
+The reason for the ordering is search and context, not quality: a README image
+is the constrained, unsolved problem, and it is the one that has to autoplay
+inline where developers actually look.
+
 ## Users
 
 Anyone shipping something with a UI: hackathon teams, open source maintainers,
