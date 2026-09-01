@@ -7,10 +7,18 @@
       body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; }
       #dashboard { display: none; margin-top: 400px; height: 300px; background: #eef; }
       .shown { display: block !important; }
+      /* Deliberately near the top of the page and full-width, so flipping it
+         changes a large fraction of the captured viewport. A change below the
+         fold would leave successive frames byte-identical and the capture would
+         look broken when it is not. */
+      #banner { height: 120px; background: #eee; }
+      #banner.flipped { background: #202040; }
     </style>
   </head>
   <body>
     <h1>Fixture App</h1>
+    <div id="banner">Banner</div>
+    <button id="toggle">Toggle</button>
     <input id="email" placeholder="Email" />
     <!-- Hidden decoy: shares a class with #signin so a CSS-selector target ("`.cta`")
          matches both. It comes first in document order, so a resolver that only
@@ -22,6 +30,9 @@
     <script>
       document.getElementById('signin').addEventListener('click', () => {
         document.getElementById('dashboard').classList.add('shown');
+      });
+      document.getElementById('toggle').addEventListener('click', () => {
+        document.getElementById('banner').classList.toggle('flipped');
       });
     </script>
   </body>

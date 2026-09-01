@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 import { resolveBrowser, launchOptionsFor, systemProbe } from '../../src/browser/resolve.js';
 import { executeScript, TargetNotFoundError } from '../../src/runtime/execute.js';
 import { resolveTarget } from '../../src/runtime/targets.js';
@@ -95,5 +96,27 @@ describe('startScreencast', () => {
     expect(frameSet.width).toBe(800);
     expect(frameSet.height).toBe(600);
     expect(frameSet.frames[0]!.data.byteLength).toBeGreaterThan(0);
+  });
+
+  // The deliverable is an animation, so "the capture records change" is the one
+  // claim this product cannot afford to be wrong about. #banner is at the top of
+  // the fixture and fills the width, so clicking Toggle repaints a large slice
+  // of the viewport - if first and last frames are still byte-identical, the
+  // capture pipeline is broken, not the fixture.
+  it('captures visibly different frames when the page changes', async () => {
+    await page.goto(FIXTURE);
+    await page.setViewportSize({ width: 800, height: 600 });
+    const screencast = await startScreencast(page);
+    await executeScript(page, parse('wait 300\nclick "Toggle"\nwait 600'));
+    const frameSet = await screencast.stop();
+
+    expect(frameSet.frames.length).toBeGreaterThan(1);
+
+    const hash = (frame: { data: Buffer }) =>
+      createHash('sha256').update(frame.data).digest('hex');
+    const first = hash(frameSet.frames[0]!);
+    const last = hash(frameSet.frames[frameSet.frames.length - 1]!);
+
+    expect(last).not.toBe(first);
   });
 });
