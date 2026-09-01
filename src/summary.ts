@@ -1,4 +1,4 @@
-import { basename } from 'node:path';
+import { basename, extname } from 'node:path';
 import type { OutputFormat } from './encode/presets.js';
 
 export interface EmittedOutput {
@@ -33,7 +33,8 @@ export function formatSummary(outputs: EmittedOutput[]): string {
   const image = outputs.find((output) => IMAGE_FORMATS.includes(output.format));
   if (image) {
     const name = basename(image.path);
-    lines.push('', '  Paste into your README:', `  ![demo](${name})`);
+    const alt = basename(image.path, extname(image.path));
+    lines.push('', '  Paste into your README:', `  ![${alt}](${name})`);
   }
 
   return lines.join('\n');

@@ -41,15 +41,21 @@ export async function startScreencast(page: Page): Promise<Screencast> {
     });
   });
 
+  // Constructed before Page.startScreencast is sent: if a frame arrived
+  // during that await with onWarm not yet assigned, the handler's discard
+  // branch would latch warmedUp = true but have no resolver to call, so
+  // `warmup` below would never settle and every capture would stall for the
+  // full timeout - with frames straddling the startedAt reset out of order.
+  const warmup = new Promise<void>((resolveWarm) => {
+    onWarm = resolveWarm;
+  });
+
   await client.send('Page.startScreencast', {
     format: 'jpeg',
     quality: 90,
     everyNthFrame: 1,
   });
 
-  const warmup = new Promise<void>((resolveWarm) => {
-    onWarm = resolveWarm;
-  });
   // Best-effort nudge: a style write forces a compositor frame even on a
   // blank page, so the warm-up frame arrives promptly instead of waiting for
   // whatever the caller's script happens to do first.

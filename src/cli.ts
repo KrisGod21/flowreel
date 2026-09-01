@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { runScript } from './run.js';
+import { runScript, EmptyCaptureError } from './run.js';
 import { formatSummary } from './summary.js';
 import { ReelParseError } from './parser/parse.js';
 import { TargetNotFoundError } from './runtime/execute.js';
@@ -32,7 +32,7 @@ export async function main(argv: string[]): Promise<number> {
     process.stdout.write(`\n${formatSummary(outputs)}\n\n`);
     return 0;
   } catch (error) {
-    if (error instanceof ReelParseError || error instanceof TargetNotFoundError) {
+    if (error instanceof ReelParseError || error instanceof TargetNotFoundError || error instanceof EmptyCaptureError) {
       process.stderr.write(`\n${error.message}\n\n`);
       return 1;
     }

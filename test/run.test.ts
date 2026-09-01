@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { mkdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { runScript } from '../src/run.js';
+import { runScript, assertFramesCaptured, EmptyCaptureError } from '../src/run.js';
 
 const SCRATCH = resolve('.tmp/run-test');
 const FIXTURE = pathToFileURL(resolve('test/fixtures/app/index.html')).href;
@@ -23,7 +23,7 @@ describe('runScript', () => {
     for (const output of outputs) {
       expect((await stat(output.path)).size).toBeGreaterThan(0);
     }
-    expect(outputs.map((o) => o.format)).toContain('mp4');
+    expect(outputs.map((o) => o.format).sort()).toEqual(['gif', 'mp4']);
   });
 
   it('honours a preset override from the caller', async () => {
@@ -33,5 +33,18 @@ describe('runScript', () => {
     );
 
     expect(outputs.map((o) => o.format)).toEqual(['mp4']);
+  });
+});
+
+describe('assertFramesCaptured', () => {
+  it('throws a plain-language error when nothing was captured', () => {
+    expect(() => assertFramesCaptured([])).toThrow(EmptyCaptureError);
+    expect(() => assertFramesCaptured([])).toThrow(/wait/i);
+  });
+
+  it('does not throw when frames exist', () => {
+    expect(() =>
+      assertFramesCaptured([{ data: Buffer.from('x'), timestampMs: 0 }]),
+    ).not.toThrow();
   });
 });

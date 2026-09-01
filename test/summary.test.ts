@@ -20,6 +20,11 @@ describe('formatSummary', () => {
     expect(text).toContain('![demo](demo.gif)');
   });
 
+  it('derives the snippet alt text from the output filename, not a hardcoded label', () => {
+    const text = formatSummary([{ path: 'shot.gif', bytes: 100, format: 'gif', overBudget: false }]);
+    expect(text).toContain('![shot](shot.gif)');
+  });
+
   it('flags an output that missed its budget', () => {
     const text = formatSummary([
       { path: 'demo.gif', bytes: 9_000_000, format: 'gif', overBudget: true },
