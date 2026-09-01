@@ -7,6 +7,7 @@ import { ffmpegBinary, probeFfmpeg, type FfmpegCapabilities } from './probe.js';
 import { resampleToFps } from '../capture/trim.js';
 import { degrade, MAX_ATTEMPTS } from './budget.js';
 import type { OutputFormat, OutputSpec } from './presets.js';
+import { UserError } from '../errors.js';
 
 const run = promisify(execFile);
 
@@ -25,7 +26,7 @@ function supports(caps: FfmpegCapabilities, format: OutputFormat): boolean {
 // lack an encoder.
 export function assertSupported(caps: FfmpegCapabilities, format: OutputFormat): void {
   if (!supports(caps, format)) {
-    throw new Error(
+    throw new UserError(
       `This ffmpeg build has no ${format} encoder, so I couldn't get a ${format} out of it. Try a different --preset.`,
     );
   }

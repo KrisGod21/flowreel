@@ -1,9 +1,10 @@
 import { tokenize } from './tokenize.js';
 import type { Command, Script } from './types.js';
+import { UserError } from '../errors.js';
 
 export type { Command, Script } from './types.js';
 
-export class ReelParseError extends Error {
+export class ReelParseError extends UserError {
   constructor(
     public readonly line: number,
     message: string,

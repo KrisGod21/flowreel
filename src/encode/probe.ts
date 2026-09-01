@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
+import { UserError } from '../errors.js';
 
 const requireCjs = createRequire(import.meta.url);
 // ffmpeg-static@5.3.0's shipped .d.ts uses ESM `export default` syntax but the package
@@ -39,7 +40,7 @@ export function parseEncoders(output: string): FfmpegCapabilities {
 
 export function ffmpegBinary(): string {
   if (!ffmpegPath) {
-    throw new Error('ffmpeg is missing from this install. Try reinstalling flowreel.');
+    throw new UserError('ffmpeg is missing from this install. Try reinstalling flowreel.');
   }
   return ffmpegPath;
 }

@@ -1,6 +1,7 @@
 import type { Page } from 'playwright';
 import type { Command, Script } from '../parser/types.js';
 import { resolveTarget, TargetNotFoundError } from './targets.js';
+import { UserError } from '../errors.js';
 
 export { TargetNotFoundError } from './targets.js';
 
@@ -11,10 +12,38 @@ const TYPE_DELAY_MS = 60;
 // shorter default.
 const WAIT_TARGET_TIMEOUT_MS = 30_000;
 
+// Playwright reports an unreachable URL with a multi-line call log naming
+// internal frames - the single most likely thing to go wrong on a first run,
+// rendered as a stack trace. Translate the two DNS/connection failures into the
+// one sentence that actually tells the user what to do.
+const UNREACHABLE = ['ERR_CONNECTION_REFUSED', 'ERR_NAME_NOT_RESOLVED'];
+
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+}
+
+async function visit(page: Page, url: string): Promise<void> {
+  try {
+    await page.goto(url, { waitUntil: 'load' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (UNREACHABLE.some((code) => message.includes(code))) {
+      throw new UserError(
+        `Nothing is running at ${hostLabel(url)} — start your dev server first, maybe \`npm run dev\`?`,
+      );
+    }
+    throw error;
+  }
+}
+
 async function runCommand(page: Page, command: Command): Promise<void> {
   switch (command.kind) {
     case 'visit':
-      await page.goto(command.url, { waitUntil: 'load' });
+      await visit(page, command.url);
       return;
 
     case 'viewport':
