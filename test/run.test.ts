@@ -77,12 +77,12 @@ describe('runScript', () => {
     expect(outputs.map((o) => o.format)).toEqual(['mp4']);
     expect((await stat(outputs[0]!.path)).size).toBeGreaterThan(0);
 
-    // The real tell. The preset encodes at width 1280 with height derived from
-    // the source aspect, so a capture that is uniformly 1000x700 yields
-    // 1280x896. If the viewport were applied mid-capture the encoder would
-    // instead latch onto the pre-resize 1280x720 frame and squeeze everything
-    // after it into the wrong aspect ratio.
-    expect(await videoSize(outputs[0]!.path)).toBe('1280x896');
+    // The real tell. The capture is uniformly 1000x700 and the preset never
+    // upscales, so the video is 1000x700. Applied mid-capture instead, the
+    // encoder latches onto the pre-resize 1280x720 first frame and everything
+    // after it is squeezed into the wrong aspect ratio - this assertion reads
+    // 1280x720 in that case.
+    expect(await videoSize(outputs[0]!.path)).toBe('1000x700');
   });
 
   // An explicit extension overrides the preset's format choice: one file,

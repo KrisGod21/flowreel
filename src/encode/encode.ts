@@ -32,6 +32,16 @@ export function assertSupported(caps: FfmpegCapabilities, format: OutputFormat):
   }
 }
 
+// Under .flowreel/ because that is the one directory .gitignore covers: the old
+// sibling `.flowreel-frames-*` name meant a Ctrl-C mid-encode left an untracked
+// directory sitting in the user's project. Still keyed by outPath's own basename
+// so that concurrent encodeOutput calls writing into the same directory - one
+// preset can emit several formats from a single capture - never share a scratch
+// directory and stomp on each other's frame files.
+export function scratchDirFor(outPath: string): string {
+  return resolve(dirname(outPath), '.flowreel', 'tmp', basename(outPath));
+}
+
 async function writeFrames(frames: Frame[], dir: string): Promise<void> {
   await mkdir(dir, { recursive: true });
   await Promise.all(
@@ -43,7 +53,10 @@ async function writeFrames(frames: Frame[], dir: string): Promise<void> {
 
 function argsFor(spec: OutputSpec, dir: string, outPath: string): string[] {
   const input = ['-y', '-framerate', String(spec.fps), '-i', resolve(dir, '%06d.jpg')];
-  const scale = `scale=${spec.width}:-2:flags=lanczos`;
+  // min(width, iw): capture at native resolution and downscale per output,
+  // never upscale. A 900px-wide preset must not blow an 800px viewport up to
+  // 900 and call the blur a feature.
+  const scale = `scale='min(${spec.width},iw)':-2:flags=lanczos`;
 
   switch (spec.format) {
     case 'gif':
@@ -70,11 +83,7 @@ export async function encodeOutput(
   const caps = await probeFfmpeg();
   assertSupported(caps, spec.format);
 
-  // Named after outPath's own basename (not a fixed constant) so that
-  // concurrent encodeOutput calls writing into the same output directory -
-  // one preset can emit several formats from a single capture - never share
-  // a scratch directory and stomp on each other's frame files.
-  const scratch = resolve(dirname(outPath), `.flowreel-frames-${basename(outPath)}`);
+  const scratch = scratchDirFor(outPath);
   let current: OutputSpec | null = spec;
   let attempt = 0;
   let last = 0;

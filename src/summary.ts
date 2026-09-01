@@ -23,8 +23,12 @@ export function humanBytes(bytes: number): string {
 }
 
 export function formatSummary(outputs: EmittedOutput[]): string {
+  // Width from the widest name rather than a fixed 12, or `my-product-demo.gif`
+  // pushes its own size column out of line with every other row.
+  const column = Math.max(0, ...outputs.map((output) => basename(output.path).length));
+
   const lines = outputs.map((output) => {
-    const name = basename(output.path).padEnd(12);
+    const name = basename(output.path).padEnd(column);
     const size = humanBytes(output.bytes).padStart(8);
     const note = output.overBudget ? '  (over budget)' : '';
     return `  ${name}${size}   ${DESTINATIONS[output.format]}${note}`;

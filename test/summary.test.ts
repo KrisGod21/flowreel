@@ -32,6 +32,16 @@ describe('formatSummary', () => {
     expect(text).toMatch(/over budget/i);
   });
 
+  it('aligns the size column against the longest name, not a fixed width', () => {
+    const text = formatSummary([
+      { path: 'my-product-launch-demo.gif', bytes: 1_800_000, format: 'gif', overBudget: false },
+      { path: 'demo.mp4', bytes: 740_000, format: 'mp4', overBudget: false },
+    ]);
+
+    const [first, second] = text.split('\n');
+    expect(first!.indexOf('1.8 MB')).toBe(second!.indexOf('740 KB'));
+  });
+
   it('omits the README snippet when only a video was produced', () => {
     const text = formatSummary([{ path: 'demo.mp4', bytes: 100, format: 'mp4', overBudget: false }]);
     expect(text).not.toContain('![');

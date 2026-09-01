@@ -45,7 +45,20 @@ export function ffmpegBinary(): string {
   return ffmpegPath;
 }
 
+// Memoized on the promise, not the result, so that the parallel encodes of a
+// single `default` run share one spawn instead of racing two. The answer is a
+// property of the binary on disk and cannot change within a run.
+let probed: Promise<FfmpegCapabilities> | undefined;
+
 export async function probeFfmpeg(): Promise<FfmpegCapabilities> {
-  const { stdout } = await run(ffmpegBinary(), ['-hide_banner', '-encoders']);
-  return parseEncoders(stdout);
+  probed ??= run(ffmpegBinary(), ['-hide_banner', '-encoders']).then(
+    ({ stdout }) => parseEncoders(stdout),
+    (error: unknown) => {
+      // Do not cache a failure: a transient spawn error should not poison every
+      // later call in the process.
+      probed = undefined;
+      throw error;
+    },
+  );
+  return probed;
 }

@@ -60,16 +60,35 @@ function parseLine(tokens: string[], line: number): Command {
       if (arg !== 'up' && arg !== 'down') {
         throw new ReelParseError(line, `scroll needs up, down, or "to <target>", got "${arg}"`);
       }
-      const amount = tokens[2];
-      return amount === undefined
-        ? { kind: 'scroll', direction: arg }
-        : { kind: 'scroll', direction: arg, amount: Number(amount) };
+      const raw = tokens[2];
+      if (raw === undefined) return { kind: 'scroll', direction: arg };
+
+      // Without this, `scroll down abc` parses to amount: NaN and surfaces much
+      // later as page.mouse.wheel(0, NaN) - a raw runtime failure, at the one
+      // moment the user has already paid for a browser launch and a capture.
+      const amount = Number(raw);
+      if (!Number.isFinite(amount) || amount < 0) {
+        throw new ReelParseError(line, `scroll needs a distance in pixels, got "${raw}"`);
+      }
+      return { kind: 'scroll', direction: arg, amount };
     }
 
     case 'wait': {
       const arg = need(tokens, 1, line, 'a duration, "idle", or a target');
       if (arg === 'idle') return { kind: 'wait', idle: true };
       if (/^\d+$/.test(arg)) return { kind: 'wait', ms: Number(arg) };
+
+      // Anything else numeric - `wait -100`, `wait 1.5`, `wait 1e3` - is a
+      // duration the user got wrong, not a target named "-100". Say so, rather
+      // than searching the page for an element by that name and reporting the
+      // confusing "couldn't find -100 on the page".
+      if (Number.isFinite(Number(arg))) {
+        throw new ReelParseError(
+          line,
+          `wait needs a whole number of milliseconds, got "${arg}"`,
+        );
+      }
+
       return { kind: 'wait', target: arg };
     }
 

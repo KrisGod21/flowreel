@@ -1,7 +1,5 @@
 import type { Frame } from './types.js';
 
-export type { Frame, FrameSet } from './types.js';
-
 export function trimIdle(frames: Frame[], thresholdMs: number): Frame[] {
   if (frames.length === 0) return [];
 

@@ -82,6 +82,28 @@ describe('parse', () => {
     expect(() => parse('theme neon')).toThrow(/light.*dark/i);
   });
 
+  it('rejects a non-numeric scroll amount instead of passing NaN to the mouse', () => {
+    expect(() => parse('scroll down abc')).toThrow(ReelParseError);
+    expect(() => parse('scroll down abc')).toThrow(/distance in pixels.*abc/i);
+  });
+
+  it('rejects a negative scroll amount', () => {
+    expect(() => parse('scroll down -50')).toThrow(ReelParseError);
+  });
+
+  it('rejects a negative wait duration rather than hunting for an element named "-100"', () => {
+    expect(() => parse('wait -100')).toThrow(ReelParseError);
+    expect(() => parse('wait -100')).toThrow(/whole number of milliseconds/i);
+  });
+
+  it('rejects a fractional wait duration', () => {
+    expect(() => parse('wait 1.5')).toThrow(/whole number of milliseconds/i);
+  });
+
+  it('still treats a non-numeric wait argument as a target', () => {
+    expect(parse('wait "#dashboard"').commands).toEqual([{ kind: 'wait', target: '#dashboard' }]);
+  });
+
   it('reports an unterminated quote as a parse error with the right line', () => {
     let err: unknown;
     try {
