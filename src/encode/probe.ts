@@ -1,11 +1,11 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import ffmpegPath from 'ffmpeg-static';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const ffmpegPath = require('ffmpeg-static');
 
 const run = promisify(execFile);
-
-// ffmpeg-static exports as a string at runtime but TypeScript needs type assertion
-const ffmpegPathString = (ffmpegPath as unknown) as string;
 
 export interface FfmpegCapabilities {
   h264: boolean;
@@ -28,10 +28,10 @@ export function parseEncoders(output: string): FfmpegCapabilities {
 }
 
 export function ffmpegBinary(): string {
-  if (!ffmpegPathString) {
+  if (!ffmpegPath) {
     throw new Error('ffmpeg is missing from this install. Try reinstalling flowreel.');
   }
-  return ffmpegPathString;
+  return ffmpegPath;
 }
 
 export async function probeFfmpeg(): Promise<FfmpegCapabilities> {
