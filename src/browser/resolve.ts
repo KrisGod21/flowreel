@@ -28,20 +28,47 @@ export function launchOptionsFor(choice: BrowserChoice): { channel?: Channel } {
   return choice.kind === 'channel' ? { channel: choice.channel } : {};
 }
 
-const CHANNEL_PATHS: Record<Channel, string[]> = {
-  chrome: [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/usr/bin/google-chrome',
-  ],
-  msedge: [
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    '/usr/bin/microsoft-edge',
-  ],
-};
+export function candidatePaths(channel: Channel, env: NodeJS.ProcessEnv): string[] {
+  const paths: string[] = [];
+
+  // Windows paths - derive from environment variables
+  const localAppData = env.LOCALAPPDATA;
+  const programFiles = env['ProgramFiles'];
+  const programFilesX86 = env['ProgramFiles(x86)'];
+
+  if (channel === 'chrome') {
+    if (localAppData) {
+      paths.push(`${localAppData}\\Google\\Chrome\\Application\\chrome.exe`);
+    }
+    if (programFiles) {
+      paths.push(`${programFiles}\\Google\\Chrome\\Application\\chrome.exe`);
+    }
+    if (programFilesX86) {
+      paths.push(`${programFilesX86}\\Google\\Chrome\\Application\\chrome.exe`);
+    }
+  } else if (channel === 'msedge') {
+    if (localAppData) {
+      paths.push(`${localAppData}\\Microsoft\\Edge\\Application\\msedge.exe`);
+    }
+    if (programFilesX86) {
+      paths.push(`${programFilesX86}\\Microsoft\\Edge\\Application\\msedge.exe`);
+    }
+    if (programFiles) {
+      paths.push(`${programFiles}\\Microsoft\\Edge\\Application\\msedge.exe`);
+    }
+  }
+
+  // macOS and Linux paths - platform-independent
+  if (channel === 'chrome') {
+    paths.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
+    paths.push('/usr/bin/google-chrome');
+  } else if (channel === 'msedge') {
+    paths.push('/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge');
+    paths.push('/usr/bin/microsoft-edge');
+  }
+
+  return paths;
+}
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -54,7 +81,8 @@ async function exists(path: string): Promise<boolean> {
 
 export const systemProbe: BrowserProbe = {
   async channelAvailable(channel) {
-    for (const path of CHANNEL_PATHS[channel]) {
+    const paths = candidatePaths(channel, process.env);
+    for (const path of paths) {
       if (await exists(path)) return true;
     }
     return false;
