@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import type { Frame } from '../capture/types.js';
 import { ffmpegBinary, probeFfmpeg, type FfmpegCapabilities } from './probe.js';
 import { resampleToFps } from '../capture/trim.js';
@@ -69,7 +69,11 @@ export async function encodeOutput(
   const caps = await probeFfmpeg();
   assertSupported(caps, spec.format);
 
-  const scratch = resolve(dirname(outPath), '.flowreel-frames');
+  // Named after outPath's own basename (not a fixed constant) so that
+  // concurrent encodeOutput calls writing into the same output directory -
+  // one preset can emit several formats from a single capture - never share
+  // a scratch directory and stomp on each other's frame files.
+  const scratch = resolve(dirname(outPath), `.flowreel-frames-${basename(outPath)}`);
   let current: OutputSpec | null = spec;
   let attempt = 0;
   let last = 0;
