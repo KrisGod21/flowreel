@@ -1,0 +1,25 @@
+{
+  "name": "flowreel",
+  "version": "0.1.0",
+  "description": "Record a polished demo of your web app by clicking through it once.",
+  "type": "module",
+  "bin": { "flowreel": "./dist/cli.js" },
+  "main": "./dist/cli.js",
+  "files": ["dist"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "playwright": "^1.49.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}
