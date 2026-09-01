@@ -7,7 +7,12 @@ export type Command =
   | { kind: 'hover'; target: string }
   | { kind: 'scroll'; direction: 'up' | 'down'; amount?: number }
   | { kind: 'scroll'; to: string }
-  | { kind: 'wait'; ms?: number; target?: string; idle?: boolean }
+  // Three genuinely different commands that share a keyword, so they are three
+  // members rather than one bag of optional fields - `{ kind: 'wait' }` with
+  // nothing set is not a thing the parser can produce and should not typecheck.
+  | { kind: 'wait'; ms: number }
+  | { kind: 'wait'; target: string }
+  | { kind: 'wait'; idle: true }
   | { kind: 'zoom'; target: string }
   | { kind: 'resetZoom' }
   | { kind: 'highlight'; target: string }

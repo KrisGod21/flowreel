@@ -6,6 +6,11 @@ export { TargetNotFoundError } from './targets.js';
 
 const TYPE_DELAY_MS = 60;
 
+// `wait <target>` exists precisely to wait for something slow to appear, so it
+// gets Playwright's own actionability budget rather than resolveTarget's
+// shorter default.
+const WAIT_TARGET_TIMEOUT_MS = 30_000;
+
 async function runCommand(page: Page, command: Command): Promise<void> {
   switch (command.kind) {
     case 'visit':
@@ -46,17 +51,18 @@ async function runCommand(page: Page, command: Command): Promise<void> {
     }
 
     case 'wait': {
-      if (command.ms !== undefined) {
+      if ('ms' in command) {
         await page.waitForTimeout(command.ms);
         return;
       }
-      if (command.idle) {
+      if ('idle' in command) {
         await page.waitForLoadState('networkidle');
         return;
       }
-      if (command.target !== undefined) {
-        await (await resolveTarget(page, command.target)).waitFor({ state: 'visible' });
-      }
+      await (await resolveTarget(page, command.target, WAIT_TARGET_TIMEOUT_MS)).waitFor({
+        state: 'visible',
+        timeout: WAIT_TARGET_TIMEOUT_MS,
+      });
       return;
     }
 

@@ -9,6 +9,7 @@ import { startScreencast } from '../../src/capture/screencast.js';
 import { parse } from '../../src/parser/parse.js';
 
 const FIXTURE = pathToFileURL(resolve('test/fixtures/app/index.html')).href;
+const DELAYED_FIXTURE = pathToFileURL(resolve('test/fixtures/app/delayed.html')).href;
 
 let browser: Browser;
 let page: Page;
@@ -55,6 +56,30 @@ describe('executeScript', () => {
     expect((err as Error).message).toContain('Sign in');
     expect((err as Error).message).toContain('Register');
     expect((err as Error).message).not.toContain('Hidden decoy');
+  });
+});
+
+describe('resolveTarget auto-wait', () => {
+  // The archetypal `npx flowreel` target is a dev server whose framework mounts
+  // after `load` fires. A point-in-time resolver throws before the button
+  // exists; a polling one waits for it.
+  it('waits for a target that appears after load', async () => {
+    await page.goto(DELAYED_FIXTURE, { waitUntil: 'load' });
+    await executeScript(page, parse('click "Later"'));
+    expect(await page.locator('#later').count()).toBe(1);
+  });
+
+  it('still reports a genuinely absent target, naming what it did find', async () => {
+    await page.goto(DELAYED_FIXTURE, { waitUntil: 'load' });
+    let err: unknown;
+    try {
+      await resolveTarget(page, 'Never appears', 1_000);
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(TargetNotFoundError);
+    expect((err as Error).message).toContain('Never appears');
+    expect((err as Error).message).toContain('Ready');
   });
 });
 
