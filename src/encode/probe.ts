@@ -2,8 +2,13 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
 
-const require = createRequire(import.meta.url);
-const ffmpegPath = require('ffmpeg-static');
+const requireCjs = createRequire(import.meta.url);
+// ffmpeg-static@5.3.0's shipped .d.ts uses ESM `export default` syntax but the package
+// has no "type": "module" and its real index.js does `module.exports = binaryPath`
+// (CommonJS export=). That mismatch makes every static import form resolve to the wrong
+// type under NodeNext. createRequire's require() bypasses the broken .d.ts, so we restore
+// the real type by hand to match the package's documented runtime contract.
+const ffmpegPath: string | null = requireCjs('ffmpeg-static');
 
 const run = promisify(execFile);
 
