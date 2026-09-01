@@ -1,9 +1,11 @@
 # Decision: README image format (Task 10)
 
-**Status: DECISION NOT YET FINAL.** `README_IMAGE_FORMAT` in `src/encode/presets.ts`
-remains `'gif'` — the safe default — until the GitHub-rendering verification in
-the "Pending" section below is actually performed. Nothing in this document
-authorizes changing that constant; see that section for what's still open.
+**Status: DECISION FINAL FOR NOW — `README_IMAGE_FORMAT` stays `'gif'`.**
+Two of the six rendering checks have since been performed (GitHub web UI, for
+both WebP and GIF) and both passed. Four remain unanswered — the GitHub mobile
+app and the npm package page. The brief's rule is that WebP becomes the default
+only if it renders *everywhere* on the list, so `'gif'` remains the only value
+consistent with the evidence. See "GitHub rendering verification" below.
 
 ## What this covers
 
@@ -146,28 +148,70 @@ AVIF frame counts were verified with `ffmpeg -i <file> -f null -`, which
 count in its summary line; both the official (3) and motion (11) AVIF frame
 counts matched the number of input frames exactly.
 
-## Pending: GitHub rendering verification
+## GitHub rendering verification
 
-**None of the following have been checked.** This is the entire reason
-`README_IMAGE_FORMAT` has not been changed. Per the brief's Step 2, these six
-yes/no questions require pushing the candidates to a scratch branch on the
-real GitHub repo and observing behavior there — that is a publish action and
-is left for the repo owner to decide on and carry out separately.
+The repo owner authorized publishing, so the web-UI half of this was carried
+out: the three motion-set candidates were pushed to a throwaway orphan branch
+`format-test` on `KrisGod21/blastradius` with a README embedding each by
+repo-relative path, observed in a browser, and the branch was then deleted.
 
-1. Does the animated WebP autoplay inline in a README on the GitHub **web UI**? — **unanswered**
+1. Does the animated WebP render inline in a README on the GitHub **web UI**? — **YES**
 2. Does it autoplay in the GitHub **mobile app**? — **unanswered**
 3. Does it render on the **npm package page**? — **unanswered**
-4. Does the GIF autoplay inline in a README on the GitHub **web UI**? (expected: yes) — **unanswered**
+4. Does the GIF render inline in a README on the GitHub **web UI**? — **YES**
 5. Does the GIF autoplay in the GitHub **mobile app**? (expected: yes) — **unanswered**
 6. Does the GIF render on the **npm package page**? (expected: yes) — **unanswered**
 
+Bonus observation: **AVIF also rendered inline on the GitHub web UI.**
+
+### Evidence for questions 1 and 4
+
+GitHub rewrote each repo-relative path to
+`https://github.com/KrisGod21/blastradius/raw/format-test/.fmt/candidate.<ext>`
+and served all three. Inspecting the live `<img>` elements gave, for every one
+of GIF, WebP and AVIF:
+
+```
+complete: true, naturalWidth: 900, naturalHeight: 600
+```
+
+Non-zero natural dimensions mean the browser decoded the bytes — a format
+GitHub refused to serve, or one the browser could not decode, reports `0x0`
+and shows broken-image alt text. A screenshot of the rendered WebP additionally
+showed the actual recorded fixture-app content, confirming it is a real decode
+of our clip and not a placeholder.
+
+### What this evidence does NOT establish
+
+Rendering was verified; **visible animation on GitHub was not**. Pixel sampling
+was blocked — the images are served cross-origin without CORS headers, so
+`canvas.getImageData` throws `SecurityError` and the frames could not be
+compared programmatically. The file itself is independently confirmed animated
+by RIFF-container parsing (above), and Chromium animates animated WebP in an
+`<img>`, so animation is very likely — but it is inference, not measurement.
+Anyone finalizing this should watch the image on a GitHub page and confirm.
+
+### Why GIF still wins for now
+
+The npm package page matters specifically for this project: `npx flowreel` is
+the primary install path, so npmjs.com is the second-most-likely place a
+stranger sees the demo. npm renders README markdown through its own pipeline
+with its own sanitizer, and nothing here establishes it handles animated WebP.
+Combined with the unverified mobile app, that leaves the brief's "renders
+everywhere" bar unmet.
+
+The upside is real and worth revisiting — 4.94x smaller on the measured clip,
+full color instead of 256 — so this should be re-decided during the
+distribution plan, when a package can actually be published and observed. The
+cheapest path to a final answer is to check npm's rendering of an animated
+WebP once the first version is on the registry.
+
 ## Current state of the constant
 
-`README_IMAGE_FORMAT` in `src/encode/presets.ts` is `'gif'` and stays that
-way as part of this commit. Per the brief's Step 4: it only becomes `'webp'`
-if WebP is confirmed to render everywhere in the list above; if it fails
-anywhere, it stays `'gif'`. Since none of the six checks have been run yet,
-`'gif'` is the only value consistent with the evidence gathered so far.
+`README_IMAGE_FORMAT` in `src/encode/presets.ts` is `'gif'` and stays that way.
+Per the brief's Step 4 it only becomes `'webp'` once WebP is confirmed to render
+everywhere on the list. Two of six checks now pass and four are unanswered, so
+`'gif'` remains the only value consistent with the evidence.
 
 ## Files produced (not committed — scratch, under gitignored `.tmp/`)
 
