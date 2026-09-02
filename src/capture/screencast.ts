@@ -71,6 +71,24 @@ export async function startScreencast(page: Page): Promise<Screencast> {
   warmedUp = true;
   startedAt = Date.now();
 
+  // The nudge above only ever fires on the document that happened to be
+  // loaded when the screencast started - typically about:blank. A caller's
+  // script almost always does a cross-document navigation next (`visit`),
+  // and nothing forces a compositor frame on the freshly-loaded document: if
+  // the script then just sits still (a static page, no click/type/hover to
+  // repaint something), the capture window can close with zero frames. Once
+  // warm-up is done every subsequent `load` is a real navigation, so re-run
+  // the same best-effort nudge each time one fires - the resulting frame is
+  // a genuine frame of the new document and is kept, not discarded. Must
+  // never throw: the page can be mid-navigation or mid-teardown.
+  page.on('load', () => {
+    void page
+      .evaluate(() => {
+        document.documentElement.style.colorScheme = document.documentElement.style.colorScheme ? '' : 'normal';
+      })
+      .catch(() => {});
+  });
+
   return {
     async stop(): Promise<FrameSet> {
       try {
