@@ -121,10 +121,13 @@ export const OVERLAY_SOURCE = `
           { duration: ms, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' },
         ).finished.catch(() => {}).then(remove);
         // Belt and braces: the Web Animations finished promise resolves on a
-        // timeline tick, which can be delayed well past the animation's end under
-        // load. Node.remove() is a documented no-op on an already-detached node, so
-        // whichever path fires second does nothing.
-        setTimeout(remove, ms + 400);
+        // timeline tick, which can be delayed past the animation's end under load.
+        // The margin is deliberately small - it must bound cleanup latency tightly
+        // enough to be observable, and a node still alive 200ms after a fully
+        // faded-out animation is invisible anyway. Node.remove() is a documented
+        // no-op on an already-detached node, so whichever path fires second does
+        // nothing.
+        setTimeout(remove, ms + 200);
       },
 
       chip(text, x, y, ms) {
@@ -145,10 +148,13 @@ export const OVERLAY_SOURCE = `
           { duration: ms, easing: 'ease-out', fill: 'forwards' },
         ).finished.catch(() => {}).then(remove);
         // Belt and braces: the Web Animations finished promise resolves on a
-        // timeline tick, which can be delayed well past the animation's end under
-        // load. Node.remove() is a documented no-op on an already-detached node, so
-        // whichever path fires second does nothing.
-        setTimeout(remove, ms + 400);
+        // timeline tick, which can be delayed past the animation's end under load.
+        // The margin is deliberately small - it must bound cleanup latency tightly
+        // enough to be observable, and a node still alive 200ms after a fully
+        // faded-out animation is invisible anyway. Node.remove() is a documented
+        // no-op on an already-detached node, so whichever path fires second does
+        // nothing.
+        setTimeout(remove, ms + 200);
       },
 
       setZoom(scale, originX, originY, ms) {
