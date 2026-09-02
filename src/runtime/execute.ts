@@ -61,7 +61,14 @@ async function runCommand(page: Page, command: Command, overlay?: Overlay): Prom
 
     case 'click': {
       const locator = await resolveTarget(page, command.target);
-      const point = await centreOf(locator);
+      // Scroll before measuring, not after: centreOf reads boundingBox(),
+      // which for a below-fold target returns a point outside the viewport.
+      // The cursor would then glide to (and vanish past) that point, and only
+      // afterwards would locator.click()'s own scrollIntoViewIfNeeded jump the
+      // page - an unexplained cut in the recording. Guarded on overlay so the
+      // no-overlay path stays byte-identical to today.
+      if (overlay) await locator.scrollIntoViewIfNeeded();
+      const point = overlay ? await centreOf(locator) : null;
       if (overlay && point) {
         await overlay.showCursor(true);
         await overlay.moveTo(point);
@@ -74,7 +81,8 @@ async function runCommand(page: Page, command: Command, overlay?: Overlay): Prom
 
     case 'type': {
       const locator = await resolveTarget(page, command.target);
-      const point = await centreOf(locator);
+      if (overlay) await locator.scrollIntoViewIfNeeded();
+      const point = overlay ? await centreOf(locator) : null;
       if (overlay && point) {
         await overlay.showCursor(true);
         await overlay.moveTo(point);
@@ -95,7 +103,8 @@ async function runCommand(page: Page, command: Command, overlay?: Overlay): Prom
 
     case 'hover': {
       const locator = await resolveTarget(page, command.target);
-      const point = await centreOf(locator);
+      if (overlay) await locator.scrollIntoViewIfNeeded();
+      const point = overlay ? await centreOf(locator) : null;
       if (overlay && point) {
         await overlay.showCursor(true);
         await overlay.moveTo(point);
@@ -138,6 +147,7 @@ async function runCommand(page: Page, command: Command, overlay?: Overlay): Prom
     case 'zoom': {
       if (!overlay) return;
       const locator = await resolveTarget(page, command.target);
+      await locator.scrollIntoViewIfNeeded();
       const point = await centreOf(locator);
       if (point) await overlay.zoom(ZOOM_SCALE, point);
       return;
@@ -150,6 +160,7 @@ async function runCommand(page: Page, command: Command, overlay?: Overlay): Prom
     case 'highlight': {
       if (!overlay) return;
       const locator = await resolveTarget(page, command.target);
+      await locator.scrollIntoViewIfNeeded();
       const box = await locator.boundingBox();
       if (box) {
         await overlay.highlight({
@@ -161,6 +172,10 @@ async function runCommand(page: Page, command: Command, overlay?: Overlay): Prom
       }
       return;
     }
+
+    case 'resetHighlight':
+      if (overlay) await overlay.highlight(null);
+      return;
 
     case 'caption':
       if (overlay) await overlay.caption(command.text);

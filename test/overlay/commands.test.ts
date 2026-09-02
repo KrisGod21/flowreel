@@ -65,6 +65,34 @@ describe('overlay-driven commands', () => {
     expect(style).toContain('opacity: 1');
   });
 
+  it('clears the highlight scrim with "reset highlight"', async () => {
+    await executeScript(page, parse(`visit ${FIXTURE}\nhighlight "#register"`), overlay);
+    await executeScript(page, parse('reset highlight'), overlay);
+    const style = await page.evaluate(
+      () =>
+        (window as never as { __flowreelOverlay: { root: ShadowRoot } })
+          .__flowreelOverlay.root.querySelector('.fr-highlight')!.getAttribute('style') ?? '',
+    );
+    expect(style).toContain('opacity: 0');
+  });
+
+  it('scrolls a below-fold target into view before gliding the cursor to it', async () => {
+    // #dashboard only appears after Sign in, and its `margin-top: 400px`
+    // (see test/fixtures/app/index.html) puts it well below an 800x600
+    // viewport - the ordinary case for a CTA further down the page.
+    await executeScript(
+      page,
+      parse(`visit ${FIXTURE}\nclick "Sign in"\nclick "#dashboard"`),
+      overlay,
+    );
+
+    const cursor = await overlay.cursorPosition();
+    expect(cursor.x).toBeGreaterThanOrEqual(0);
+    expect(cursor.x).toBeLessThanOrEqual(800);
+    expect(cursor.y).toBeGreaterThanOrEqual(0);
+    expect(cursor.y).toBeLessThanOrEqual(600);
+  });
+
   it('still works with no overlay at all', async () => {
     await executeScript(page, parse(`visit ${FIXTURE}\nclick "Sign in"\ncaption "ignored"\nzoom "#signin"`));
     await expect(page.locator('#dashboard')).toBeVisible();

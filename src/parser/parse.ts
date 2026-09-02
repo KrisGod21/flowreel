@@ -96,8 +96,9 @@ function parseLine(tokens: string[], line: number): Command {
       return { kind: 'zoom', target: need(tokens, 1, line, 'something to zoom to') };
 
     case 'reset':
-      if (tokens[1] !== 'zoom') throw new ReelParseError(line, 'the only reset is "reset zoom"');
-      return { kind: 'resetZoom' };
+      if (tokens[1] === 'zoom') return { kind: 'resetZoom' };
+      if (tokens[1] === 'highlight') return { kind: 'resetHighlight' };
+      throw new ReelParseError(line, 'the only resets are "reset zoom" and "reset highlight"');
 
     case 'highlight':
       return { kind: 'highlight', target: need(tokens, 1, line, 'something to highlight') };
