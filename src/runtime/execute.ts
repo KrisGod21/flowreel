@@ -13,7 +13,7 @@ const ZOOM_SCALE = 1.6;
 // The chip must outlive pressSequentially's own delay budget
 // (text.length * TYPE_DELAY_MS) or it fades away mid-keystroke; the tail is
 // slack on top of that so it lingers briefly after the last character too.
-const CHIP_TAIL_MS = 300;
+const CHIP_TAIL_MS = 500;
 
 async function centreOf(locator: Locator): Promise<Point | null> {
   const box = await locator.boundingBox();

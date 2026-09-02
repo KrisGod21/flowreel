@@ -1,25 +1,33 @@
 # flowreel example — start your dev server, then: npx flowreel examples/demo.reel
+# Every selector below is a PLACEHOLDER - swap in real ones from your app.
+# zoom/highlight now throw after a 5s search rather than doing nothing, so a
+# missing target stalls and aborts instead of silently skipping.
 visit http://localhost:3000
 viewport 1280x800
 
 # A caption stays on screen until the next one; "" clears it.
 caption "Sign in with one click"
+click "#signin"
+wait idle
 
-# The cursor glides to the button and leaves a ripple where it lands.
-click "Sign in"
-wait 800
+# type + press draw the keystroke chip - flowreel's headline feature.
+type "#email" "demo@example.com"
+press Enter
+wait 500
 
-# Zoom pulls the viewer's eye to one element, so small text stays legible
-# once the recording is scaled down to README width.
+# Zoom pulls the eye to one element, so small text stays legible once the
+# recording is scaled down to README width.
 zoom "#dashboard"
 caption "Your dashboard, ready to go"
 wait 1200
 reset zoom
 
-# Highlight rings the target and dims everything around it.
+# Highlight rings a target and dims everything around it.
 highlight "#new-project"
 caption "Start a project"
 wait 1000
 
+# End cleared - a looping README animation should not sit permanently dimmed.
 caption ""
+reset highlight
 output demo
