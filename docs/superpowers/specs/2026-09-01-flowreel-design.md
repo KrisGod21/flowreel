@@ -134,6 +134,22 @@ There is no frame-by-frame compositing step. This is dramatically less code,
 pixel-accurate by construction, resolution-independent, and is the single reason
 this project is finishable by one person.
 
+**Refinement, decided during Plan 2.** This rule governs everything that changes
+from frame to frame, which is where the complexity lives. Framing is the one
+exception, and necessarily so: browser chrome, rounded corners, a drop shadow and
+a gradient backdrop wrap *around* the page, and a screencast only captures the
+viewport itself, so there is no inside-the-page way to draw them.
+
+Framing is therefore composited in the encoder as a static border applied to
+every frame (an ffmpeg `pad` plus `overlay`). That is cheap and deterministic
+because the border never changes; the expensive, error-prone kind of compositing
+— per-frame content — stays injected. The considered alternative, hosting the
+target app in an iframe inside a chrome-drawing shell page, would have kept the
+rule literally true but breaks on any app sending `X-Frame-Options` or a CSP
+`frame-ancestors`, and would change how every command resolves its target.
+
+Framing ships after the injected layer, in its own plan.
+
 ## Output formats
 
 A run emits an image for the README and a video for everywhere else. The image

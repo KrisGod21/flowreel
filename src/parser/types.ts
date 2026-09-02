@@ -16,6 +16,7 @@ export type Command =
   | { kind: 'zoom'; target: string }
   | { kind: 'resetZoom' }
   | { kind: 'highlight'; target: string }
+  | { kind: 'resetHighlight' }
   | { kind: 'caption'; text: string }
   | { kind: 'theme'; mode: 'light' | 'dark' }
   | { kind: 'output'; name: string; preset?: string };

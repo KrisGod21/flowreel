@@ -5,6 +5,7 @@ import { parse } from './parser/parse.js';
 import { resolveBrowser, launchOptionsFor, systemProbe } from './browser/resolve.js';
 import { executeScript } from './runtime/execute.js';
 import { startScreencast } from './capture/screencast.js';
+import { Overlay } from './overlay/api.js';
 import { trimIdle } from './capture/trim.js';
 import { encodeOutput } from './encode/encode.js';
 import { PRESETS } from './encode/presets.js';
@@ -129,8 +130,12 @@ export async function runScript(source: string, options: RunOptions): Promise<Em
     const viewport = initialViewport(script);
     if (viewport) await page.setViewportSize(viewport);
 
+    // Installed before the screencast so the first captured frame already has
+    // the overlay, and before any visit so addInitScript covers every document.
+    const overlay = await Overlay.install(page);
+
     const screencast = await startScreencast(page);
-    await executeScript(page, script);
+    await executeScript(page, script, overlay);
     const frameSet = await screencast.stop();
 
     const frames = trimIdle(frameSet.frames, IDLE_THRESHOLD_MS);

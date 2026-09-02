@@ -104,6 +104,19 @@ describe('parse', () => {
     expect(parse('wait "#dashboard"').commands).toEqual([{ kind: 'wait', target: '#dashboard' }]);
   });
 
+  it('parses "reset zoom"', () => {
+    expect(parse('reset zoom').commands).toEqual([{ kind: 'resetZoom' }]);
+  });
+
+  it('parses "reset highlight"', () => {
+    expect(parse('reset highlight').commands).toEqual([{ kind: 'resetHighlight' }]);
+  });
+
+  it('rejects a reset target other than zoom or highlight', () => {
+    expect(() => parse('reset theme')).toThrow(ReelParseError);
+    expect(() => parse('reset theme')).toThrow(/reset zoom.*reset highlight/i);
+  });
+
   it('reports an unterminated quote as a parse error with the right line', () => {
     let err: unknown;
     try {
