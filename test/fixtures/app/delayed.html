@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>flowreel delayed fixture</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; }
+    </style>
+  </head>
+  <body>
+    <h1>Delayed App</h1>
+    <button id="ready">Ready</button>
+    <div id="late"></div>
+    <!-- Stands in for a client-rendered app (Vite/Next/CRA dev server): the page
+         fires `load` while the framework is still mounting, and the button the
+         user's script clicks only appears a few hundred milliseconds later. A
+         point-in-time target resolver misses it; an auto-waiting one does not. -->
+    <script>
+      setTimeout(() => {
+        const button = document.createElement('button');
+        button.id = 'later';
+        button.textContent = 'Later';
+        document.getElementById('late').appendChild(button);
+      }, 300);
+    </script>
+  </body>
+</html>

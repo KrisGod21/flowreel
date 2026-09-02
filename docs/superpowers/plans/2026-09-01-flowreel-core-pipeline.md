@@ -808,7 +808,15 @@ Create `src/encode/probe.ts`:
 ```ts
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import ffmpegPath from 'ffmpeg-static';
+import { createRequire } from 'node:module';
+
+// `import ffmpegPath from 'ffmpeg-static'` does not compile under NodeNext:
+// the package's .d.ts uses ESM `export default` while its index.js does
+// `module.exports =`, and it sets no `"type": "module"`, so every static import
+// form resolves to the wrong type. createRequire bypasses the broken .d.ts, and
+// the annotation restores the package's real runtime contract by hand.
+const requireCjs = createRequire(import.meta.url);
+const ffmpegPath: string | null = requireCjs('ffmpeg-static');
 
 const run = promisify(execFile);
 
