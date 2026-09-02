@@ -1,21 +1,25 @@
-# A .reel script is just the demo you would give by hand, written down.
-# Run it with:  npx flowreel examples/demo.reel
-
+# flowreel example — start your dev server, then: npx flowreel examples/demo.reel
 visit http://localhost:3000
 viewport 1280x800
 
-# Give a dev server a moment to finish mounting before the first click.
-wait idle
+# A caption stays on screen until the next one; "" clears it.
+caption "Sign in with one click"
 
+# The cursor glides to the button and leaves a ripple where it lands.
 click "Sign in"
-type "#email" "demo@example.com"
-press Enter
-
-# Targets are matched by button label first, then visible text, then CSS.
-wait "#dashboard"
-hover ".card"
-scroll down 400
 wait 800
 
-# No extension: the preset decides. `output demo.gif` would emit only the GIF.
+# Zoom pulls the viewer's eye to one element, so small text stays legible
+# once the recording is scaled down to README width.
+zoom "#dashboard"
+caption "Your dashboard, ready to go"
+wait 1200
+reset zoom
+
+# Highlight rings the target and dims everything around it.
+highlight "#new-project"
+caption "Start a project"
+wait 1000
+
+caption ""
 output demo
