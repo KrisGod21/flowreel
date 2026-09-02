@@ -59,8 +59,10 @@ describe('cursor', () => {
     const started = Date.now();
     await overlay.moveTo({ x: 500, y: 400 }, 300);
     const elapsed = Date.now() - started;
-    expect(elapsed).toBeGreaterThanOrEqual(200);
-    expect(elapsed).toBeLessThan(1500);
+    expect(elapsed).toBeGreaterThanOrEqual(250);
+    // One frame plus a round-trip of slack, not a 5x allowance - the loose
+    // bound here is what let a 2x overshoot pass unnoticed.
+    expect(elapsed).toBeLessThan(650);
   });
 
   it('moves instantly when the duration is zero', async () => {

@@ -46,7 +46,7 @@ export class Overlay {
 
   async showCursor(show: boolean): Promise<void> {
     await this.page.evaluate(
-      (value) => (window as never as OverlayWindow).__flowreelOverlay?.api.showCursor(value),
+      (value) => (window as unknown as OverlayWindow).__flowreelOverlay?.api.showCursor(value),
       show,
     );
   }
@@ -54,13 +54,13 @@ export class Overlay {
   async cursorPosition(): Promise<Point> {
     return this.page.evaluate(
       () =>
-        (window as never as OverlayWindow).__flowreelOverlay?.api.cursorAt() ?? { x: 0, y: 0 },
+        (window as unknown as OverlayWindow).__flowreelOverlay?.api.cursorAt() ?? { x: 0, y: 0 },
     );
   }
 
   private async placeCursor(point: Point): Promise<void> {
     await this.page.evaluate(
-      (p: Point) => (window as never as OverlayWindow).__flowreelOverlay?.api.placeCursor(p.x, p.y),
+      (p: Point) => (window as unknown as OverlayWindow).__flowreelOverlay?.api.placeCursor(p.x, p.y),
       point,
     );
   }
@@ -77,15 +77,25 @@ export class Overlay {
     }
 
     const from = await this.cursorPosition();
-    const steps = Math.max(1, Math.round(durationMs / Overlay.FRAME_MS));
+    const started = Date.now();
 
-    for (let step = 1; step <= steps; step++) {
-      const eased = easeInOutCubic(step / steps);
+    // Progress is driven by elapsed time, not by a step counter, so the
+    // per-step page.evaluate round-trip is absorbed into the requested
+    // duration rather than added on top of it. On a slow machine this
+    // renders fewer intermediate frames instead of running long, which is
+    // the better failure for a recording.
+    for (;;) {
+      const elapsed = Date.now() - started;
+      const progress = Math.min(1, elapsed / durationMs);
+      const eased = easeInOutCubic(progress);
+
       await this.placeCursor({
         x: Math.round(lerp(from.x, point.x, eased)),
         y: Math.round(lerp(from.y, point.y, eased)),
       });
-      if (step < steps) await this.page.waitForTimeout(Overlay.FRAME_MS);
+
+      if (progress >= 1) return;
+      await this.page.waitForTimeout(Overlay.FRAME_MS);
     }
   }
 }
