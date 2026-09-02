@@ -60,6 +60,16 @@ describe('Overlay host', () => {
     await overlay.caption('');
   });
 
+  it('overlay elements are unreachable by Playwright locators', async () => {
+    await overlay.caption('Unreachable');
+    // Playwright's css engine pierces OPEN shadow roots. If the root were open,
+    // these would find our elements. Closed roots are opaque to it, so both must
+    // be 0 - this is the assertion that actually pins mode: 'closed'.
+    expect(await page.locator('.fr-caption').count()).toBe(0);
+    expect(await page.locator('.fr-cursor').count()).toBe(0);
+    await overlay.caption('');
+  });
+
   it('does not intercept real clicks', async () => {
     await page.goto(FIXTURE);
     await page.locator('#signin').click();

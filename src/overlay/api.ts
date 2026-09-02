@@ -12,19 +12,30 @@ export class Overlay {
     await page.addInitScript(OVERLAY_SOURCE);
     // addInitScript only affects documents created after it is registered, so
     // run it once by hand for the document already loaded.
-    await page.evaluate(OVERLAY_SOURCE).catch(() => {
-      // A page still on about:blank can reject; the init script covers it next.
+    await page.evaluate(OVERLAY_SOURCE).catch((error: unknown) => {
+      // A page still on about:blank, or one navigating/closing right now, tears
+      // down the execution context - observed messages are "Execution context
+      // was destroyed, most likely because of a navigation." and "Target page,
+      // context or browser has been closed." The init script covers those
+      // documents anyway. Anything else (e.g. a syntax error introduced into
+      // OVERLAY_SOURCE) must not be swallowed silently.
+      const message = error instanceof Error ? error.message : String(error);
+      const isContextTeardown =
+        message.includes('Execution context was destroyed') ||
+        message.includes('Target page, context or browser has been closed') ||
+        message.includes('Target closed');
+      if (!isContextTeardown) throw error;
     });
     return new Overlay(page);
   }
 
   async isInstalled(): Promise<boolean> {
-    return this.page.evaluate(() => Boolean((window as never as OverlayWindow).__flowreelOverlay));
+    return this.page.evaluate(() => Boolean((window as unknown as OverlayWindow).__flowreelOverlay));
   }
 
   async caption(text: string): Promise<void> {
     await this.page.evaluate(
-      (value) => (window as never as OverlayWindow).__flowreelOverlay?.api.setCaption(value),
+      (value) => (window as unknown as OverlayWindow).__flowreelOverlay?.api.setCaption(value),
       text,
     );
   }
