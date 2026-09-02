@@ -1,5 +1,7 @@
 import type { Page } from 'playwright';
 import { OVERLAY_SOURCE } from './browser.js';
+import { easeInOutCubic, lerp } from './ease.js';
+import type { Point } from './types.js';
 
 export class Overlay {
   private constructor(private readonly page: Page) {}
@@ -38,6 +40,53 @@ export class Overlay {
       (value) => (window as unknown as OverlayWindow).__flowreelOverlay?.api.setCaption(value),
       text,
     );
+  }
+
+  private static readonly FRAME_MS = 16;
+
+  async showCursor(show: boolean): Promise<void> {
+    await this.page.evaluate(
+      (value) => (window as never as OverlayWindow).__flowreelOverlay?.api.showCursor(value),
+      show,
+    );
+  }
+
+  async cursorPosition(): Promise<Point> {
+    return this.page.evaluate(
+      () =>
+        (window as never as OverlayWindow).__flowreelOverlay?.api.cursorAt() ?? { x: 0, y: 0 },
+    );
+  }
+
+  private async placeCursor(point: Point): Promise<void> {
+    await this.page.evaluate(
+      (p: Point) => (window as never as OverlayWindow).__flowreelOverlay?.api.placeCursor(p.x, p.y),
+      point,
+    );
+  }
+
+  /**
+   * Glides the cursor to `point` on an eased path. Stepped from Node so the
+   * compositor paints genuine intermediate frames for the screencast to capture;
+   * a CSS transition would leave frame timing to chance.
+   */
+  async moveTo(point: Point, durationMs = 420): Promise<void> {
+    if (durationMs <= 0) {
+      await this.placeCursor(point);
+      return;
+    }
+
+    const from = await this.cursorPosition();
+    const steps = Math.max(1, Math.round(durationMs / Overlay.FRAME_MS));
+
+    for (let step = 1; step <= steps; step++) {
+      const eased = easeInOutCubic(step / steps);
+      await this.placeCursor({
+        x: Math.round(lerp(from.x, point.x, eased)),
+        y: Math.round(lerp(from.y, point.y, eased)),
+      });
+      if (step < steps) await this.page.waitForTimeout(Overlay.FRAME_MS);
+    }
   }
 }
 
