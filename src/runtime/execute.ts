@@ -1,11 +1,20 @@
-import type { Page } from 'playwright';
+import type { Locator, Page } from 'playwright';
 import type { Command, Script } from '../parser/types.js';
 import { resolveTarget, TargetNotFoundError } from './targets.js';
 import { UserError } from '../errors.js';
+import type { Overlay } from '../overlay/api.js';
+import type { Point } from '../overlay/types.js';
 
 export { TargetNotFoundError } from './targets.js';
 
 const TYPE_DELAY_MS = 60;
+const CLICK_SETTLE_MS = 140;
+const ZOOM_SCALE = 1.6;
+
+async function centreOf(locator: Locator): Promise<Point | null> {
+  const box = await locator.boundingBox();
+  return box ? { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) } : null;
+}
 
 // `wait <target>` exists precisely to wait for something slow to appear, so it
 // gets Playwright's own actionability budget rather than resolveTarget's
@@ -40,7 +49,7 @@ async function visit(page: Page, url: string): Promise<void> {
   }
 }
 
-async function runCommand(page: Page, command: Command): Promise<void> {
+async function runCommand(page: Page, command: Command, overlay?: Overlay): Promise<void> {
   switch (command.kind) {
     case 'visit':
       await visit(page, command.url);
@@ -50,23 +59,50 @@ async function runCommand(page: Page, command: Command): Promise<void> {
       await page.setViewportSize({ width: command.width, height: command.height });
       return;
 
-    case 'click':
-      await (await resolveTarget(page, command.target)).click();
+    case 'click': {
+      const locator = await resolveTarget(page, command.target);
+      const point = await centreOf(locator);
+      if (overlay && point) {
+        await overlay.showCursor(true);
+        await overlay.moveTo(point);
+        await overlay.ripple(point);
+        await page.waitForTimeout(CLICK_SETTLE_MS);
+      }
+      await locator.click();
       return;
+    }
 
-    case 'type':
-      await (await resolveTarget(page, command.target)).pressSequentially(command.text, {
-        delay: TYPE_DELAY_MS,
-      });
+    case 'type': {
+      const locator = await resolveTarget(page, command.target);
+      const point = await centreOf(locator);
+      if (overlay && point) {
+        await overlay.showCursor(true);
+        await overlay.moveTo(point);
+        await overlay.chip(command.text, point);
+      }
+      await locator.pressSequentially(command.text, { delay: TYPE_DELAY_MS });
       return;
+    }
 
-    case 'press':
+    case 'press': {
+      if (overlay) {
+        const at = await overlay.cursorPosition();
+        await overlay.chip(command.key, at);
+      }
       await page.keyboard.press(command.key);
       return;
+    }
 
-    case 'hover':
-      await (await resolveTarget(page, command.target)).hover();
+    case 'hover': {
+      const locator = await resolveTarget(page, command.target);
+      const point = await centreOf(locator);
+      if (overlay && point) {
+        await overlay.showCursor(true);
+        await overlay.moveTo(point);
+      }
+      await locator.hover();
       return;
+    }
 
     case 'scroll': {
       if ('to' in command) {
@@ -99,12 +135,35 @@ async function runCommand(page: Page, command: Command): Promise<void> {
       await page.emulateMedia({ colorScheme: command.mode });
       return;
 
-    // The overlay layer lands in Plan 2. Until then these are no-ops so that a
-    // script written today keeps working unchanged once overlays exist.
-    case 'zoom':
+    case 'zoom': {
+      if (!overlay) return;
+      const locator = await resolveTarget(page, command.target);
+      const point = await centreOf(locator);
+      if (point) await overlay.zoom(ZOOM_SCALE, point);
+      return;
+    }
+
     case 'resetZoom':
-    case 'highlight':
+      if (overlay) await overlay.resetZoom();
+      return;
+
+    case 'highlight': {
+      if (!overlay) return;
+      const locator = await resolveTarget(page, command.target);
+      const box = await locator.boundingBox();
+      if (box) {
+        await overlay.highlight({
+          x: Math.round(box.x) - 4,
+          y: Math.round(box.y) - 4,
+          width: Math.round(box.width) + 8,
+          height: Math.round(box.height) + 8,
+        });
+      }
+      return;
+    }
+
     case 'caption':
+      if (overlay) await overlay.caption(command.text);
       return;
 
     case 'output':
@@ -112,8 +171,8 @@ async function runCommand(page: Page, command: Command): Promise<void> {
   }
 }
 
-export async function executeScript(page: Page, script: Script): Promise<void> {
+export async function executeScript(page: Page, script: Script, overlay?: Overlay): Promise<void> {
   for (const command of script.commands) {
-    await runCommand(page, command);
+    await runCommand(page, command, overlay);
   }
 }
