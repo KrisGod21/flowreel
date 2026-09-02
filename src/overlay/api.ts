@@ -3,6 +3,13 @@ import { OVERLAY_SOURCE } from './browser.js';
 import { easeInOutCubic, lerp } from './ease.js';
 import type { Point } from './types.js';
 
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export class Overlay {
   private constructor(private readonly page: Page) {}
 
@@ -98,6 +105,58 @@ export class Overlay {
       await this.page.waitForTimeout(Overlay.FRAME_MS);
     }
   }
+
+  async captionText(): Promise<string> {
+    return this.page.evaluate(
+      () => (window as unknown as OverlayWindow).__flowreelOverlay?.api.captionText() ?? '',
+    );
+  }
+
+  async ripple(point: Point, ms = 480): Promise<void> {
+    await this.page.evaluate(
+      (args: { p: Point; ms: number }) =>
+        (window as unknown as OverlayWindow).__flowreelOverlay?.api.ripple(args.p.x, args.p.y, args.ms),
+      { p: point, ms },
+    );
+  }
+
+  async chip(text: string, point: Point, ms = 700): Promise<void> {
+    await this.page.evaluate(
+      (args: { text: string; p: Point; ms: number }) =>
+        (window as unknown as OverlayWindow).__flowreelOverlay?.api.chip(
+          args.text,
+          args.p.x,
+          args.p.y,
+          args.ms,
+        ),
+      { text, p: point, ms },
+    );
+  }
+
+  async highlight(rect: Rect | null): Promise<void> {
+    await this.page.evaluate(
+      (value: Rect | null) =>
+        (window as unknown as OverlayWindow).__flowreelOverlay?.api.highlightRect(value),
+      rect,
+    );
+  }
+
+  async zoom(scale: number, origin: Point, ms = 520): Promise<void> {
+    await this.page.evaluate(
+      (args: { scale: number; o: Point; ms: number }) =>
+        (window as unknown as OverlayWindow).__flowreelOverlay?.api.setZoom(
+          args.scale,
+          args.o.x,
+          args.o.y,
+          args.ms,
+        ),
+      { scale, o: origin, ms },
+    );
+  }
+
+  async resetZoom(ms = 420): Promise<void> {
+    await this.zoom(1, { x: 0, y: 0 }, ms);
+  }
 }
 
 interface OverlayWindow {
@@ -109,7 +168,7 @@ interface OverlayWindow {
       placeCursor(x: number, y: number): void;
       captionText(): string;
       setCaption(text: string): void;
-      highlightRect(rect: { x: number; y: number; width: number; height: number } | null): void;
+      highlightRect(rect: Rect | null): void;
       ripple(x: number, y: number, ms: number): void;
       chip(text: string, x: number, y: number, ms: number): void;
       setZoom(scale: number, originX: number, originY: number, ms: number): void;
