@@ -76,7 +76,7 @@ export const OVERLAY_SOURCE = `
     const cursor = el('.fr-cursor');
     const caption = el('.fr-caption');
     const highlight = el('.fr-highlight');
-    const state = { x: 0, y: 0 };
+    const state = { x: 0, y: 0, chip: null };
 
     const api = {
       cursorAt: () => ({ x: state.x, y: state.y }),
@@ -137,7 +137,20 @@ export const OVERLAY_SOURCE = `
         node.style.left = x + 'px';
         node.style.top = y + 'px';
         root.appendChild(node);
-        const remove = () => node.remove();
+        state.chip = node;
+        // ms === 0 means "stay until dismissChip() is called" - used for
+        // keystroke chips, whose true lifetime is however long
+        // pressSequentially actually takes, not a guess made in advance.
+        // Skip the animation and the timed fallback entirely; the node just
+        // sits at full opacity until told otherwise.
+        if (ms === 0) {
+          node.style.opacity = '1';
+          return;
+        }
+        const remove = () => {
+          if (state.chip === node) state.chip = null;
+          node.remove();
+        };
         node.animate(
           [
             { opacity: 0, transform: 'translate(-50%,-120%)' },
@@ -155,6 +168,22 @@ export const OVERLAY_SOURCE = `
         // no-op on an already-detached node, so whichever path fires second does
         // nothing.
         setTimeout(remove, ms + 200);
+      },
+
+      dismissChip() {
+        const node = state.chip;
+        if (!node) return;
+        state.chip = null;
+        const remove = () => node.remove();
+        node.animate(
+          [
+            { opacity: 1, transform: 'translate(-50%,-150%)' },
+            { opacity: 0, transform: 'translate(-50%,-185%)' },
+          ],
+          { duration: 220, easing: 'ease-out', fill: 'forwards' },
+        ).finished.catch(() => {}).then(remove);
+        // Same belt-and-braces reasoning as chip()'s own fallback above.
+        setTimeout(remove, 420);
       },
 
       setZoom(scale, originX, originY, ms) {

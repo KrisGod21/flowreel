@@ -10,10 +10,6 @@ export { TargetNotFoundError } from './targets.js';
 const TYPE_DELAY_MS = 60;
 const CLICK_SETTLE_MS = 140;
 const ZOOM_SCALE = 1.6;
-// The chip must outlive pressSequentially's own delay budget
-// (text.length * TYPE_DELAY_MS) or it fades away mid-keystroke; the tail is
-// slack on top of that so it lingers briefly after the last character too.
-const CHIP_TAIL_MS = 500;
 
 async function centreOf(locator: Locator): Promise<Point | null> {
   const box = await locator.boundingBox();
@@ -90,9 +86,15 @@ async function runCommand(page: Page, command: Command, overlay?: Overlay): Prom
       if (overlay && point) {
         await overlay.showCursor(true);
         await overlay.moveTo(point);
-        await overlay.chip(command.text, point, command.text.length * TYPE_DELAY_MS + CHIP_TAIL_MS);
+        // ms=0 keeps the chip up until dismissChip() below, instead of
+        // guessing a duration up front: pressSequentially pays a round-trip
+        // per character on top of its nominal delay, so any prediction based
+        // on text.length * TYPE_DELAY_MS undershoots real typing time - worse
+        // under load - and the chip fades out mid-keystroke.
+        await overlay.chip(command.text, point, 0);
       }
       await locator.pressSequentially(command.text, { delay: TYPE_DELAY_MS });
+      if (overlay && point) await overlay.dismissChip();
       return;
     }
 

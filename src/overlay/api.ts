@@ -190,6 +190,13 @@ export class Overlay {
     );
   }
 
+  /**
+   * Shows a keystroke chip at `point`. `ms` is the chip's self-timed
+   * lifetime; pass `0` to keep it on screen indefinitely, until a matching
+   * `dismissChip()` call fades it out. The indefinite form exists because a
+   * chip's true duration - e.g. however long `pressSequentially` actually
+   * takes - can only be known by the caller, never predicted in advance.
+   */
   async chip(text: string, point: Point, ms = 700): Promise<void> {
     await this.page.evaluate(
       (args: { text: string; p: Point; ms: number }) =>
@@ -200,6 +207,13 @@ export class Overlay {
           args.ms,
         ),
       { text, p: point, ms },
+    );
+  }
+
+  /** Fades out and removes the current keystroke chip, if one is showing. */
+  async dismissChip(): Promise<void> {
+    await this.page.evaluate(
+      () => (window as unknown as OverlayWindow).__flowreelOverlay?.api.dismissChip(),
     );
   }
 
@@ -241,6 +255,7 @@ interface OverlayWindow {
       highlightRect(rect: Rect | null): void;
       ripple(x: number, y: number, ms: number): void;
       chip(text: string, x: number, y: number, ms: number): void;
+      dismissChip(): void;
       setZoom(scale: number, originX: number, originY: number, ms: number): void;
     };
   };
