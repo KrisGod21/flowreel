@@ -98,12 +98,47 @@ describe('zoom', () => {
   it('applies a scale transform and fully reverts', async () => {
     await overlay.zoom(1.6, { x: 400, y: 300 }, 50);
     await page.waitForTimeout(200);
-    const zoomed = await page.evaluate(() => document.documentElement.style.transform);
+    // The overlay host is a sibling of document.body (both children of
+    // documentElement), so setZoom transforms body - see the comment on
+    // setZoom in src/overlay/browser.ts for why that matters.
+    const zoomed = await page.evaluate(() => document.body.style.transform);
     expect(zoomed).toContain('scale(1.6)');
 
     await overlay.resetZoom(50);
     await page.waitForTimeout(200);
-    const reset = await page.evaluate(() => document.documentElement.style.transform);
+    const reset = await page.evaluate(() => document.body.style.transform);
     expect(reset).toBe('');
+  });
+
+  it('keeps overlay elements at viewport coordinates while zoomed', async () => {
+    // The zoom origin and the cursor's target point are deliberately far
+    // apart on both axes: a point close to the transform origin barely moves
+    // under a scale, which would let this test pass even with the bug
+    // present (verified empirically - see the F1 section of the fix report).
+    // The wait after zoom must clear the transition comfortably: at 200ms
+    // (4x a 50ms transition) this was observed to be racy under load, letting
+    // the assertion below sometimes read a mid-transition value and pass by
+    // accident even with the bug present.
+    await overlay.zoom(1.6, { x: 700, y: 50 }, 50);
+    await page.waitForTimeout(800);
+    await overlay.moveTo({ x: 50, y: 550 }, 0);
+
+    // cursorAt() returns the number we asked for and so can never see this
+    // bug; the rendered rect is what the screencast actually captures. If
+    // setZoom transformed documentElement instead of body, the host would sit
+    // inside the transformed subtree and this rect would land at roughly
+    // origin + (point - origin) * 1.6, far from (50, 550).
+    const rect = await page.evaluate(() => {
+      const root = (window as unknown as { __flowreelOverlay: { root: ShadowRoot } })
+        .__flowreelOverlay.root;
+      const { x, y } = root.querySelector('.fr-cursor')!.getBoundingClientRect();
+      return { x, y };
+    });
+
+    expect(Math.abs(rect.x - 50)).toBeLessThan(6);
+    expect(Math.abs(rect.y - 550)).toBeLessThan(6);
+
+    await overlay.resetZoom(50);
+    await page.waitForTimeout(200);
   });
 });

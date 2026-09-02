@@ -46,11 +46,13 @@ describe('overlay-driven commands', () => {
   it('applies and reverts zoom from zoom / reset zoom', async () => {
     await executeScript(page, parse(`visit ${FIXTURE}\nzoom "#signin"`), overlay);
     await page.waitForTimeout(250);
-    expect(await page.evaluate(() => document.documentElement.style.transform)).toContain('scale(');
+    // setZoom transforms document.body (a sibling of the overlay host), not
+    // documentElement - see src/overlay/browser.ts.
+    expect(await page.evaluate(() => document.body.style.transform)).toContain('scale(');
 
     await executeScript(page, parse('reset zoom'), overlay);
     await page.waitForTimeout(250);
-    expect(await page.evaluate(() => document.documentElement.style.transform)).toBe('');
+    expect(await page.evaluate(() => document.body.style.transform)).toBe('');
   });
 
   it('highlights the element named by highlight', async () => {

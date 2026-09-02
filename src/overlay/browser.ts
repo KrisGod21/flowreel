@@ -45,7 +45,7 @@ export const OVERLAY_SOURCE = `
           position: fixed; transform: translate(-50%, -140%);
           font: 600 13px/1.4 ui-sans-serif, system-ui, sans-serif;
           color: #fff; background: rgba(20,22,28,.92); padding: 4px 9px;
-          border-radius: 7px; white-space: pre; opacity: 0;
+          border-radius: 7px; white-space: pre-wrap; max-width: 60vw; opacity: 0;
         }
         .fr-caption {
           position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%);
@@ -158,9 +158,27 @@ export const OVERLAY_SOURCE = `
       },
 
       setZoom(scale, originX, originY, ms) {
-        const doc = document.documentElement;
+        // Transform document.body, not document.documentElement. The overlay
+        // host is appended to documentElement (see install() below), so it is
+        // a *sibling* of body, not a descendant - transforming body keeps the
+        // host completely outside the transformed subtree. If this transformed
+        // documentElement instead, the host would sit inside its own
+        // containing block and get scaled a second time on top of whatever
+        // viewport coordinates it was already given: the cursor, ripples and
+        // highlight would all render at origin + (p - origin) * scale instead
+        // of at p, and the host's inset: 0 would resolve against
+        // documentElement's padding box instead of the viewport. Do not
+        // "simplify" this back to documentElement.
+        const doc = document.body;
         doc.style.transition = 'transform ' + ms + 'ms cubic-bezier(.45,.05,.2,1)';
-        doc.style.transformOrigin = originX + 'px ' + originY + 'px';
+        // Only move the origin when actually zooming in. Writing it
+        // unconditionally on every call - including a reset - changes the
+        // origin instantly while the transform (the only thing in the
+        // transition list) still animates from the old scale, so a reset
+        // hard-cuts to the new origin at t=0 and then slides back. Leaving the
+        // origin alone on reset makes it animate as a clean reverse about the
+        // origin the zoom-in used.
+        if (scale !== 1) doc.style.transformOrigin = originX + 'px ' + originY + 'px';
         doc.style.transform = scale === 1 ? '' : 'scale(' + scale + ')';
       },
     };
