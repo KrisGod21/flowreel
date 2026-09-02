@@ -70,6 +70,17 @@ describe('Overlay host', () => {
     await overlay.caption('');
   });
 
+  it('keeps the caption visible across a navigation', async () => {
+    await overlay.caption('Still here after navigating');
+    await page.goto(FIXTURE);
+    // The init script builds a brand new overlay for the fresh document -
+    // caption empty, cursor at the origin - unless Overlay reapplies the last
+    // known state on 'load'. See the comment on Overlay's private fields in
+    // src/overlay/api.ts.
+    expect(await overlay.captionText()).toBe('Still here after navigating');
+    await overlay.caption('');
+  });
+
   it('does not intercept real clicks', async () => {
     await page.goto(FIXTURE);
     await page.locator('#signin').click();

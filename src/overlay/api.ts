@@ -11,6 +11,19 @@ export interface Rect {
 }
 
 export class Overlay {
+  // Mirrors the state a fresh document's overlay does not have. addInitScript
+  // re-runs OVERLAY_SOURCE for every new document, so a `visit` - or, far more
+  // commonly, a `click` that navigates - builds a brand new overlay: caption
+  // empty, cursor back at the origin, cursor hidden. These three fields are
+  // updated on every call that changes them and re-applied on the page's
+  // next 'load' event, so the caption and cursor survive navigation instead
+  // of silently vanishing. Zoom is deliberately NOT restored here - it
+  // belonged to the old document's layout, and reapplying it to a new one
+  // would zoom into the wrong thing (or nothing).
+  private lastCaption = '';
+  private lastCursor: Point = { x: 0, y: 0 };
+  private lastCursorVisible = false;
+
   private constructor(private readonly page: Page) {}
 
   /**
@@ -35,7 +48,36 @@ export class Overlay {
         message.includes('Target closed');
       if (!isContextTeardown) throw error;
     });
-    return new Overlay(page);
+    const overlay = new Overlay(page);
+    // 'load' fires after the init script has already installed the fresh
+    // overlay for the new document, so this always has something to write
+    // into. The handler must not throw: a `load` can fire while the page is
+    // mid-teardown (closing, or navigating again immediately), and a rejected
+    // handler here would otherwise surface as an unhandled rejection with no
+    // useful stack pointing back at the script that caused it.
+    page.on('load', () => {
+      overlay.restoreAfterNavigation().catch(() => {});
+    });
+    return overlay;
+  }
+
+  private async restoreAfterNavigation(): Promise<void> {
+    await this.page
+      .evaluate(
+        (state: { caption: string; cursor: Point; cursorVisible: boolean }) => {
+          const overlay = (window as unknown as OverlayWindow).__flowreelOverlay;
+          if (!overlay) return;
+          overlay.api.setCaption(state.caption);
+          overlay.api.placeCursor(state.cursor.x, state.cursor.y);
+          overlay.api.showCursor(state.cursorVisible);
+        },
+        { caption: this.lastCaption, cursor: this.lastCursor, cursorVisible: this.lastCursorVisible },
+      )
+      .catch(() => {
+        // The page navigated or closed again before this could run - there is
+        // nothing to restore into, and a subsequent 'load' (if any) gets
+        // another chance.
+      });
   }
 
   async isInstalled(): Promise<boolean> {
@@ -43,6 +85,7 @@ export class Overlay {
   }
 
   async caption(text: string): Promise<void> {
+    this.lastCaption = text;
     await this.page.evaluate(
       (value) => (window as unknown as OverlayWindow).__flowreelOverlay?.api.setCaption(value),
       text,
@@ -52,6 +95,7 @@ export class Overlay {
   private static readonly FRAME_MS = 16;
 
   async showCursor(show: boolean): Promise<void> {
+    this.lastCursorVisible = show;
     await this.page.evaluate(
       (value) => (window as unknown as OverlayWindow).__flowreelOverlay?.api.showCursor(value),
       show,
@@ -66,6 +110,7 @@ export class Overlay {
   }
 
   private async placeCursor(point: Point): Promise<void> {
+    this.lastCursor = point;
     await this.page.evaluate(
       (p: Point) => (window as unknown as OverlayWindow).__flowreelOverlay?.api.placeCursor(p.x, p.y),
       point,
