@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { chromium, type Browser } from 'playwright';
 import { createHash } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
@@ -22,14 +22,17 @@ const hash = (buffer: Buffer) => createHash('sha256').update(buffer).digest('hex
 
 async function captureLastFrame(withOverlay: boolean): Promise<string> {
   const page = await browser.newPage();
-  await page.setViewportSize({ width: 800, height: 600 });
-  const overlay = withOverlay ? await Overlay.install(page) : undefined;
-  const screencast = await startScreencast(page);
-  await executeScript(page, parse(SCRIPT), overlay);
-  const frames = (await screencast.stop()).frames;
-  await page.close();
-  expect(frames.length).toBeGreaterThan(0);
-  return hash(frames[frames.length - 1]!.data);
+  try {
+    await page.setViewportSize({ width: 800, height: 600 });
+    const overlay = withOverlay ? await Overlay.install(page) : undefined;
+    const screencast = await startScreencast(page);
+    await executeScript(page, parse(SCRIPT), overlay);
+    const frames = (await screencast.stop()).frames;
+    expect(frames.length).toBeGreaterThan(0);
+    return hash(frames[frames.length - 1]!.data);
+  } finally {
+    await page.close();
+  }
 }
 
 beforeAll(async () => {
@@ -50,21 +53,29 @@ describe('the overlay reaches the captured pixels', () => {
   }, 60_000);
 
   it('is installed by a real runScript call', async () => {
-    // Proves the wiring in run.ts, not just the standalone API: this script only
-    // exercises the overlay path if runScript installed one and passed it along.
-    const outputs = await runScript(
-      [
-        `visit ${FIXTURE}`,
-        'viewport 800x600',
-        'caption "Recording with overlay"',
-        'click "Sign in"',
-        'wait 500',
-        'output overlaid.gif',
-      ].join('\n'),
-      { cwd: SCRATCH },
-    );
+    const installSpy = vi.spyOn(Overlay, 'install');
+    try {
+      const outputs = await runScript(
+        [
+          `visit ${FIXTURE}`,
+          'viewport 800x600',
+          'caption "Recording with overlay"',
+          'click "Sign in"',
+          'wait 500',
+          'output overlaid.gif',
+        ].join('\n'),
+        { cwd: SCRATCH },
+      );
 
-    expect(outputs).toHaveLength(1);
-    expect(outputs[0]!.bytes).toBeGreaterThan(0);
+      // The spy calls through, so the overlay is really installed - this
+      // asserts that runScript is the thing that installs it. Without it,
+      // nothing pins the wiring in run.ts and deleting that line leaves the
+      // whole suite green.
+      expect(installSpy).toHaveBeenCalledTimes(1);
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0]!.bytes).toBeGreaterThan(0);
+    } finally {
+      installSpy.mockRestore();
+    }
   }, 60_000);
 });
