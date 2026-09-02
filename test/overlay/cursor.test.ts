@@ -69,4 +69,23 @@ describe('cursor', () => {
     await overlay.moveTo({ x: 123, y: 45 }, 0);
     expect(await overlay.cursorPosition()).toEqual({ x: 123, y: 45 });
   });
+
+  it('scales the default glide duration with distance instead of a flat 420ms', async () => {
+    // A short hop with no explicit duration should finish well under the old
+    // flat 420ms default.
+    await overlay.moveTo({ x: 100, y: 100 }, 0);
+    let started = Date.now();
+    await overlay.moveTo({ x: 120, y: 100 }, undefined);
+    const shortHop = Date.now() - started;
+    expect(shortHop).toBeLessThan(300);
+
+    // A cross-viewport glide should take noticeably longer than that short
+    // hop, but still be capped rather than growing unbounded.
+    await overlay.moveTo({ x: 0, y: 0 }, 0);
+    started = Date.now();
+    await overlay.moveTo({ x: 780, y: 580 }, undefined);
+    const longHop = Date.now() - started;
+    expect(longHop).toBeGreaterThan(shortHop);
+    expect(longHop).toBeLessThan(700);
+  });
 });

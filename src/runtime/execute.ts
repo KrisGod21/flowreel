@@ -10,6 +10,10 @@ export { TargetNotFoundError } from './targets.js';
 const TYPE_DELAY_MS = 60;
 const CLICK_SETTLE_MS = 140;
 const ZOOM_SCALE = 1.6;
+// The chip must outlive pressSequentially's own delay budget
+// (text.length * TYPE_DELAY_MS) or it fades away mid-keystroke; the tail is
+// slack on top of that so it lingers briefly after the last character too.
+const CHIP_TAIL_MS = 300;
 
 async function centreOf(locator: Locator): Promise<Point | null> {
   const box = await locator.boundingBox();
@@ -86,14 +90,16 @@ async function runCommand(page: Page, command: Command, overlay?: Overlay): Prom
       if (overlay && point) {
         await overlay.showCursor(true);
         await overlay.moveTo(point);
-        await overlay.chip(command.text, point);
+        await overlay.chip(command.text, point, command.text.length * TYPE_DELAY_MS + CHIP_TAIL_MS);
       }
       await locator.pressSequentially(command.text, { delay: TYPE_DELAY_MS });
       return;
     }
 
     case 'press': {
-      if (overlay) {
+      // cursorPosition() defaults to {0, 0} until something has moved the
+      // cursor, so a chip drawn before that would be clipped in the corner.
+      if (overlay && overlay.cursorShown) {
         const at = await overlay.cursorPosition();
         await overlay.chip(command.key, at);
       }

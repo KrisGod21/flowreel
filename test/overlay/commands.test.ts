@@ -93,6 +93,43 @@ describe('overlay-driven commands', () => {
     expect(cursor.y).toBeLessThanOrEqual(600);
   });
 
+  it('keeps the keystroke chip visible for as long as pressSequentially takes to type', async () => {
+    // 'demo@example.com' is 17 chars; at TYPE_DELAY_MS=60 typing alone takes
+    // ~1020ms. The old flat 700ms chip default would have faded out roughly
+    // 300ms before typing finished.
+    await executeScript(page, parse(`visit ${FIXTURE}\ntype "#email" "demo@example.com"`), overlay);
+    const count = () =>
+      page.evaluate(
+        () =>
+          (window as never as { __flowreelOverlay: { root: ShadowRoot } })
+            .__flowreelOverlay.root.querySelectorAll('.fr-chip').length,
+      );
+    // executeScript has just finished typing; the chip's scaled duration
+    // (text.length * TYPE_DELAY_MS + a tail) should still have it on screen.
+    expect(await count()).toBeGreaterThan(0);
+  });
+
+  it('skips the "press" chip when the cursor has never been shown', async () => {
+    // A fresh page and Overlay, not the shared one, because the shared
+    // overlay's cursor was already shown by earlier tests in this file - the
+    // whole point here is a script that presses a key before ever clicking,
+    // hovering, or typing.
+    const freshPage = await browser.newPage();
+    try {
+      await freshPage.setViewportSize({ width: 800, height: 600 });
+      const freshOverlay = await Overlay.install(freshPage);
+      await executeScript(freshPage, parse(`visit ${FIXTURE}\npress Enter`), freshOverlay);
+      const count = await freshPage.evaluate(
+        () =>
+          (window as never as { __flowreelOverlay: { root: ShadowRoot } })
+            .__flowreelOverlay.root.querySelectorAll('.fr-chip').length,
+      );
+      expect(count).toBe(0);
+    } finally {
+      await freshPage.close();
+    }
+  });
+
   it('still works with no overlay at all', async () => {
     await executeScript(page, parse(`visit ${FIXTURE}\nclick "Sign in"\ncaption "ignored"\nzoom "#signin"`));
     await expect(page.locator('#dashboard')).toBeVisible();

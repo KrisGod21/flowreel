@@ -84,6 +84,11 @@ export class Overlay {
     return this.page.evaluate(() => Boolean((window as unknown as OverlayWindow).__flowreelOverlay));
   }
 
+  /** Whether `showCursor(true)` has been called and not since hidden again. */
+  get cursorShown(): boolean {
+    return this.lastCursorVisible;
+  }
+
   async caption(text: string): Promise<void> {
     this.lastCaption = text;
     await this.page.evaluate(
@@ -117,18 +122,38 @@ export class Overlay {
     );
   }
 
+  // Bounds for the distance-proportional default glide duration below - short
+  // enough that a 30px hop does not feel sluggish, long enough that a
+  // corner-to-corner glide does not feel instant.
+  private static readonly MIN_GLIDE_MS = 160;
+  private static readonly MAX_GLIDE_MS = 520;
+
+  // Roughly reproduces the old flat 420ms default for a typical ~600px move,
+  // while scaling down for short hops and up (capped) for long ones.
+  private static glideDurationFor(from: Point, to: Point): number {
+    const distance = Math.hypot(to.x - from.x, to.y - from.y);
+    return Math.min(Overlay.MAX_GLIDE_MS, Math.max(Overlay.MIN_GLIDE_MS, distance * 0.7));
+  }
+
   /**
    * Glides the cursor to `point` on an eased path. Stepped from Node so the
    * compositor paints genuine intermediate frames for the screencast to capture;
    * a CSS transition would leave frame timing to chance.
+   *
+   * `durationMs` defaults to a distance-proportional value (see
+   * `glideDurationFor`) rather than a flat number, so a short hop does not
+   * take as long as a cross-screen glide. Pass it explicitly to override,
+   * including `0` for an instant jump.
    */
-  async moveTo(point: Point, durationMs = 420): Promise<void> {
-    if (durationMs <= 0) {
+  async moveTo(point: Point, durationMs?: number): Promise<void> {
+    const from = await this.cursorPosition();
+    const resolvedDuration = durationMs ?? Overlay.glideDurationFor(from, point);
+
+    if (resolvedDuration <= 0) {
       await this.placeCursor(point);
       return;
     }
 
-    const from = await this.cursorPosition();
     const started = Date.now();
 
     // Progress is driven by elapsed time, not by a step counter, so the
@@ -138,7 +163,7 @@ export class Overlay {
     // the better failure for a recording.
     for (;;) {
       const elapsed = Date.now() - started;
-      const progress = Math.min(1, elapsed / durationMs);
+      const progress = Math.min(1, elapsed / resolvedDuration);
       const eased = easeInOutCubic(progress);
 
       await this.placeCursor({
