@@ -112,13 +112,19 @@ export const OVERLAY_SOURCE = `
         node.style.left = x + 'px';
         node.style.top = y + 'px';
         root.appendChild(node);
+        const remove = () => node.remove();
         node.animate(
           [
             { opacity: 0.95, transform: 'scale(1)' },
             { opacity: 0, transform: 'scale(3.6)' },
           ],
           { duration: ms, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' },
-        ).finished.catch(() => {}).then(() => node.remove());
+        ).finished.catch(() => {}).then(remove);
+        // Belt and braces: the Web Animations finished promise resolves on a
+        // timeline tick, which can be delayed well past the animation's end under
+        // load. Node.remove() is a documented no-op on an already-detached node, so
+        // whichever path fires second does nothing.
+        setTimeout(remove, ms + 400);
       },
 
       chip(text, x, y, ms) {
@@ -128,6 +134,7 @@ export const OVERLAY_SOURCE = `
         node.style.left = x + 'px';
         node.style.top = y + 'px';
         root.appendChild(node);
+        const remove = () => node.remove();
         node.animate(
           [
             { opacity: 0, transform: 'translate(-50%,-120%)' },
@@ -136,7 +143,12 @@ export const OVERLAY_SOURCE = `
             { opacity: 0, transform: 'translate(-50%,-185%)' },
           ],
           { duration: ms, easing: 'ease-out', fill: 'forwards' },
-        ).finished.catch(() => {}).then(() => node.remove());
+        ).finished.catch(() => {}).then(remove);
+        // Belt and braces: the Web Animations finished promise resolves on a
+        // timeline tick, which can be delayed well past the animation's end under
+        // load. Node.remove() is a documented no-op on an already-detached node, so
+        // whichever path fires second does nothing.
+        setTimeout(remove, ms + 400);
       },
 
       setZoom(scale, originX, originY, ms) {
