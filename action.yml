@@ -2,6 +2,11 @@ name: 'flowreel'
 description: 'Regenerate a flowreel demo GIF/MP4 and commit it back to the repo'
 author: 'Krishna Sharma'
 
+# Required for a Marketplace listing. Icon names come from the Feather set.
+branding:
+  icon: 'film'
+  color: 'purple'
+
 inputs:
   script:
     description: 'Path to the .reel script to run (relative to the repo root)'

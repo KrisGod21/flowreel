@@ -132,7 +132,7 @@ Because it's the only format that autoplays inline in a GitHub README from a fil
 Add the action and your demo regenerates on every push, so the README never shows a stale UI:
 
 ```yaml
-- uses: KrisGod21/flowreel@main
+- uses: KrisGod21/flowreel@v0.2.0
   with:
     script: demo/demo.reel
     start: npm run dev            # optional: starts your app first

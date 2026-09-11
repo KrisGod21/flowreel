@@ -5,7 +5,7 @@ Regenerate a demo GIF/MP4 whenever you push, and commit the result back into the
 ## Usage
 
 ```yaml
-- uses: KrisGod21/flowreel@main
+- uses: KrisGod21/flowreel@v0.2.0
   with:
     script: demo/demo.reel
     start: npm run dev        # optional: a command to start the app first
@@ -28,7 +28,7 @@ jobs:
   regenerate:
     runs-on: ubuntu-latest
     steps:
-      - uses: KrisGod21/flowreel@main
+      - uses: KrisGod21/flowreel@v0.2.0
         with:
           script: demo/demo.reel
           start: npm run dev
@@ -68,7 +68,7 @@ GitHub-hosted runners do not ship a system Chrome, so this action downloads a fr
     path: ~/.cache/ms-playwright
     key: ${{ runner.os }}-playwright-chromium
 
-- uses: KrisGod21/flowreel@main
+- uses: KrisGod21/flowreel@v0.2.0
   with:
     script: demo/demo.reel
 ```
