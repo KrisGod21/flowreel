@@ -8,7 +8,7 @@ export function quote(text: string): string {
 function line(command: Command): string {
   switch (command.kind) {
     case 'visit':
-      return `visit ${command.url}`;
+      return `visit ${quote(command.url)}`;
     case 'viewport':
       return `viewport ${command.width}x${command.height}`;
     case 'click':

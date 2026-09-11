@@ -59,4 +59,9 @@ describe('serialize', () => {
     };
     expect(parse(serialize(script))).toEqual(script);
   });
+
+  it('round-trips a visit URL containing a hash fragment', () => {
+    const script: Script = { commands: [{ kind: 'visit', url: 'http://localhost:3000/app#/settings?tab=2' }] };
+    expect(parse(serialize(script))).toEqual(script);
+  });
 });
