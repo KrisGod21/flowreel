@@ -30,4 +30,16 @@ describe('tokenize', () => {
   it('throws on an unterminated quote', () => {
     expect(() => tokenize('click "Sign in')).toThrow(/unterminated/i);
   });
+
+  it('unescapes \\" inside a quoted string', () => {
+    expect(tokenize('caption "say \\"hi\\" now"')).toEqual(['caption', 'say "hi" now']);
+  });
+
+  it('unescapes \\\\ inside a quoted string', () => {
+    expect(tokenize('type "#f" "a\\\\b"')).toEqual(['type', '#f', 'a\\b']);
+  });
+
+  it('leaves a backslash before any other character alone', () => {
+    expect(tokenize('type "#f" "C:\\temp"')).toEqual(['type', '#f', 'C:\\temp']);
+  });
 });

@@ -7,6 +7,16 @@ export function tokenize(line: string): string[] {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
 
+    if (inQuotes && ch === '\\') {
+      const next = line[i + 1];
+      if (next === '"' || next === '\\') {
+        current += next;
+        hasCurrent = true;
+        i++;
+        continue;
+      }
+    }
+
     if (ch === '"') {
       inQuotes = !inQuotes;
       hasCurrent = true;
