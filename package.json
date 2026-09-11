@@ -1,18 +1,46 @@
 {
   "name": "flowreel",
   "version": "0.1.0",
-  "description": "Record a polished demo of your web app by clicking through it once.",
+  "description": "Record a polished demo of your web app by describing it. One script in, a README GIF and an MP4 out.",
+  "keywords": [
+    "demo",
+    "gif",
+    "screen-recording",
+    "readme",
+    "playwright",
+    "screencast",
+    "video",
+    "hackathon",
+    "cli"
+  ],
+  "author": "Krishna Sharma <krishnar.sharmanew@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KrisGod21/flowreel.git"
+  },
+  "homepage": "https://github.com/KrisGod21/flowreel#readme",
+  "bugs": {
+    "url": "https://github.com/KrisGod21/flowreel/issues"
+  },
   "type": "module",
-  "bin": { "flowreel": "./dist/cli.js" },
+  "bin": {
+    "flowreel": "./dist/cli.js"
+  },
   "main": "./dist/cli.js",
-  "files": ["dist"],
-  "engines": { "node": ">=20" },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo": "node scripts/demo.mjs",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
-  "license": "MIT",
   "dependencies": {
     "ffmpeg-static": "^5.2.0",
     "playwright": "^1.51.0"

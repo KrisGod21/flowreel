@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Acme Analytics</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --line: #262a37; --text: #e8eaf0;
+    --muted: #8b90a0; --accent: #5b8cff; --accent-2: #7ee2b8; --danger: #ff6b7a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text); background: var(--bg);
+    display: grid; grid-template-columns: 220px 1fr; min-height: 100vh;
+  }
+  aside {
+    background: var(--panel); border-right: 1px solid var(--line); padding: 22px 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; margin-bottom: 26px; }
+  .brand i { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: inline-block; }
+  nav a {
+    display: block; padding: 9px 12px; border-radius: 9px; color: var(--muted);
+    text-decoration: none; margin-bottom: 3px; font-weight: 500;
+  }
+  nav a.active, nav a:hover { background: #20243060; color: var(--text); }
+  main { padding: 26px 34px; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .btn {
+    background: var(--accent); color: #fff; border: 0; padding: 10px 16px; border-radius: 10px;
+    font-weight: 600; font-size: 14px; cursor: pointer; box-shadow: 0 6px 18px #5b8cff40;
+  }
+  .btn.secondary { background: #20243a; color: var(--text); box-shadow: none; border: 1px solid var(--line); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px;
+  }
+  .card .label { color: var(--muted); font-size: 13px; }
+  .card .value { font-size: 28px; font-weight: 700; margin-top: 4px; letter-spacing: -0.02em; }
+  .card .delta { font-size: 13px; margin-top: 4px; color: var(--accent-2); }
+  .card .delta.down { color: var(--danger); }
+  .chart { height: 180px; display: flex; align-items: flex-end; gap: 8px; padding: 18px 20px 14px; }
+  .chart b {
+    flex: 1; display: block; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, var(--accent), #5b8cff55);
+    transition: height 400ms cubic-bezier(.2,.7,.2,1);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 11px 8px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; }
+  .pill { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.ok { background: #7ee2b822; color: var(--accent-2); }
+  .pill.warn { background: #ffb85c22; color: #ffb85c; }
+  .row { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+  .search {
+    width: 280px; background: #12151d; border: 1px solid var(--line); color: var(--text);
+    padding: 10px 14px; border-radius: 10px; font-size: 14px; outline: none;
+  }
+  .search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #5b8cff30; }
+  .modal-backdrop {
+    position: fixed; inset: 0; background: #0008; display: none; align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal { width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .modal h2 { margin: 0 0 6px; font-size: 18px; }
+  .modal p { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+  .field { display: block; margin-bottom: 12px; }
+  .field span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  .field input {
+    width: 100%; background: #12151d; border: 1px solid var(--line); color: var(--text);
+    padding: 10px 12px; border-radius: 9px; font-size: 14px; outline: none;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  .toast {
+    position: fixed; right: 26px; bottom: 26px; background: var(--accent-2); color: #08261a;
+    padding: 12px 16px; border-radius: 12px; font-weight: 600; opacity: 0; transform: translateY(8px);
+    transition: opacity 220ms ease, transform 220ms ease; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+  <aside>
+    <div class="brand"><i></i>Acme Analytics</div>
+    <nav>
+      <a class="active" href="#">Overview</a>
+      <a href="#">Projects</a>
+      <a href="#">Reports</a>
+      <a href="#">Settings</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header>
+      <div>
+        <h1>Overview</h1>
+        <div class="sub">Last 30 days · updated just now</div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center">
+        <input class="search" id="search" placeholder="Search projects…" />
+        <button class="btn" id="new-project">New project</button>
+      </div>
+    </header>
+
+    <section class="stats">
+      <div class="card" id="stat-revenue">
+        <div class="label">Revenue</div>
+        <div class="value">$48,210</div>
+        <div class="delta">▲ 12.4% vs last month</div>
+      </div>
+      <div class="card">
+        <div class="label">Active users</div>
+        <div class="value">3,904</div>
+        <div class="delta">▲ 6.1%</div>
+      </div>
+      <div class="card">
+        <div class="label">Churn</div>
+        <div class="value">1.8%</div>
+        <div class="delta down">▼ 0.3%</div>
+      </div>
+    </section>
+
+    <section class="row">
+      <div class="card">
+        <div class="label">Weekly signups</div>
+        <div class="chart" id="chart">
+          <b style="height:40%"></b><b style="height:55%"></b><b style="height:48%"></b><b style="height:70%"></b>
+          <b style="height:62%"></b><b style="height:84%"></b><b style="height:78%"></b><b style="height:95%"></b>
+        </div>
+      </div>
+      <div class="card">
+        <div class="label" style="margin-bottom:8px">Recent projects</div>
+        <table id="projects">
+          <thead><tr><th>Name</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Onboarding flow</td><td><span class="pill ok">Live</span></td></tr>
+            <tr><td>Pricing page</td><td><span class="pill warn">Review</span></td></tr>
+            <tr><td>Mobile app v2</td><td><span class="pill ok">Live</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <h2>New project</h2>
+      <p>Give it a name and we'll set up the dashboard for you.</p>
+      <label class="field"><span>Project name</span><input id="project-name" placeholder="e.g. Launch campaign" /></label>
+      <div class="actions">
+        <button class="btn secondary" id="cancel">Cancel</button>
+        <button class="btn" id="create">Create project</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Project created</div>
+
+  <script>
+    const modal = document.getElementById('modal');
+    const toast = document.getElementById('toast');
+    const nameInput = document.getElementById('project-name');
+    const tbody = document.querySelector('#projects tbody');
+
+    document.getElementById('new-project').addEventListener('click', () => {
+      modal.classList.add('open');
+      nameInput.focus();
+    });
+    document.getElementById('cancel').addEventListener('click', () => modal.classList.remove('open'));
+    document.getElementById('create').addEventListener('click', () => {
+      const name = nameInput.value.trim() || 'Untitled project';
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + name + '</td><td><span class="pill ok">Live</span></td>';
+      tbody.prepend(tr);
+      modal.classList.remove('open');
+      nameInput.value = '';
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1600);
+    });
+    document.getElementById('search').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      for (const row of tbody.rows) row.style.display = row.cells[0].textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  </script>
+</body>
+</html>

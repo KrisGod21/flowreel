@@ -1,0 +1,30 @@
+# flowreel's own README demo. Regenerate it with:  npm run demo
+# __APP__ is replaced with a file:// URL to demo/app.html by scripts/demo.mjs
+
+visit __APP__
+viewport 1280x800
+wait idle
+
+caption "Describe the demo. flowreel records it."
+wait 1000
+
+highlight "New project"
+caption "Point at things by their visible text"
+wait 1200
+reset highlight
+
+click "New project"
+wait 400
+
+zoom "#project-name"
+caption "It types for you, with keystroke chips"
+type "#project-name" "Launch campaign"
+wait 700
+reset zoom
+
+click "Create project"
+caption "One recording. A README GIF and an MP4 out."
+wait 1700
+
+caption ""
+output demo
