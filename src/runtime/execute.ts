@@ -56,7 +56,7 @@ export async function visit(page: Page, url: string): Promise<void> {
     }
     if (UNREACHABLE.some((code) => message.includes(code))) {
       throw new UserError(
-        `Nothing is running at ${hostLabel(url)} — start your dev server first, maybe \`npm run dev\`?`,
+        `Nothing is running at ${hostLabel(url)} - start your dev server first, maybe \`npm run dev\`?`,
       );
     }
     throw error;

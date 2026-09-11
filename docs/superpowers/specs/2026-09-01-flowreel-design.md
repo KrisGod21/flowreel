@@ -73,6 +73,42 @@ adding timing.
 The generated script is the on-ramp to tier 2: users learn the syntax by
 reading a script of their own session rather than a manual.
 
+### Decided during Plan 3
+
+**We capture interactions and replay them; we never post-process video.** The
+user clicks through a browser flowreel opens. Every click, keystroke, scroll
+and navigation is captured as an event with a selector and a timestamp, turned
+into a `Script`, and replayed through the existing pipeline, which renders the
+cursor, ripples, chips, zoom, highlight and captions as pixel-perfect injected
+overlays. There is no video analysis and no compositing, and the output is a
+script that can be edited and re-run when the UI changes - which a video never
+can. The tradeoff, stated plainly: this records a browser tab flowreel
+controls, not the whole screen, other apps, or audio.
+
+**Auto-polish is deterministic.** No API key, no model. A pure function adds
+polish to the captured script using heuristics that look right on most apps:
+
+- typing into a field narrower than about 40% of the viewport gets a `zoom`
+  before and a `reset zoom` after, so the text is legible at README width
+- a click on an element with short visible text gets a `caption` of that text,
+  so the recording subtitles itself from the app's own labels
+- a navigation gets a `caption` of the destination's page title
+- gaps between actions become `wait` commands, clamped so a viewer can follow
+  quick clicks and never sits through a long pause
+
+Anything the heuristics get wrong is one edit away in the generated script.
+The seam is a pure `Script -> Script` function, so an opt-in model-assisted
+polish can be added later behind a flag without touching the recorder.
+
+**Stopping.** flowreel injects a small floating "Stop recording" button into
+the page, in its own isolated shadow host so it never appears in the replayed
+output and its clicks are never recorded. Ctrl+C in the terminal also stops.
+
+**Selectors prefer visible text.** A click on "Sign in" is recorded as
+`click "Sign in"`, matching how the language reads and how `resolveTarget`
+resolves. Elements without usable text fall back to an id, then a name
+attribute, then a short CSS path.
+
 ## The `.reel` script
 
 ```
