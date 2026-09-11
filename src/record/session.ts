@@ -33,7 +33,7 @@ function translateNavigationError(error: unknown, url: string): never {
     );
   }
   if (['ERR_CONNECTION_REFUSED', 'ERR_NAME_NOT_RESOLVED'].some((code) => message.includes(code))) {
-    throw new UserError(`Nothing is running at ${hostLabel(url)} — start your dev server first, maybe \`npm run dev\`?`);
+    throw new UserError(`Nothing is running at ${hostLabel(url)} - start your dev server first, maybe \`npm run dev\`?`);
   }
   throw error;
 }

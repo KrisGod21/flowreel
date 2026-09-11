@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, basename } from 'node:path';
 import { createRequire } from 'node:module';
 import { runScript } from './run.js';
 import { formatSummary } from './summary.js';
 import { UserError } from './errors.js';
+import { record } from './record/index.js';
 
 // Read from package.json rather than restating it here: a hardcoded copy and
 // the manifest drift apart, and the only test of this constant was a regex that
@@ -15,9 +16,9 @@ export const version: string = (requireCjs('../package.json') as { version: stri
 
 export const USAGE = `flowreel ${version}
 
-Usage: flowreel <script.reel> [--preset <name>]
-
-Record mode and the zero-argument flow arrive in the next milestone.
+Usage:
+  flowreel record <url> [--out <name>]    record a demo by clicking through your app
+  flowreel <script.reel> [--preset <p>]   render a demo from a script
 `;
 
 export function presetFlag(argv: string[]): string | undefined {
@@ -31,6 +32,10 @@ export function presetFlag(argv: string[]): string | undefined {
 }
 
 export async function main(argv: string[]): Promise<number> {
+  if (argv[0] === 'record') {
+    return recordCommand(argv.slice(1));
+  }
+
   const scriptPath = argv.find((arg) => arg.endsWith('.reel'));
 
   if (!scriptPath) {
@@ -56,6 +61,42 @@ export async function main(argv: string[]): Promise<number> {
     }
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       process.stderr.write(`\nI couldn't find ${scriptPath}.\n\n`);
+      return 1;
+    }
+    process.stderr.write(`\n${(error as Error).message}\n\n`);
+    return 2;
+  }
+}
+
+async function recordCommand(argv: string[]): Promise<number> {
+  const url = argv.find((a) => !a.startsWith('--'));
+  const outIndex = argv.indexOf('--out');
+  const outputName = outIndex === -1 ? undefined : argv[outIndex + 1];
+
+  if (!url) {
+    process.stderr.write(
+      '\nUsage: flowreel record <url> [--out <name>]\n\nOpens your app in a browser. Click through the feature you want to show, then press Stop.\n\n',
+    );
+    return 1;
+  }
+  if (outIndex !== -1 && !outputName) {
+    process.stderr.write('\n--out needs a name after it, like `--out demo`.\n\n');
+    return 1;
+  }
+
+  process.stderr.write('\nRecording. Click through your app in the browser, then press "Stop recording" (or Ctrl+C here).\n');
+
+  try {
+    const result = await record(url, {
+      cwd: process.cwd(),
+      outputName,
+      onScriptWritten: (path) => process.stderr.write(`\nWrote ${basename(path)}. Rendering the demo...\n`),
+    });
+    process.stdout.write(`\n${formatSummary(result.outputs)}\n\n  Edit ${basename(result.scriptPath)} and re-run it with: flowreel ${basename(result.scriptPath)}\n\n`);
+    return 0;
+  } catch (error) {
+    if (error instanceof UserError) {
+      process.stderr.write(`\n${error.message}\n\n`);
       return 1;
     }
     process.stderr.write(`\n${(error as Error).message}\n\n`);

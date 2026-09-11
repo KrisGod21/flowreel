@@ -44,7 +44,8 @@ describe('main', () => {
     const code = await main([]);
 
     expect(code).toBe(0);
-    expect(stdout).toContain('Usage: flowreel');
+    expect(stdout).toContain('Usage:');
+    expect(stdout).toContain('flowreel record <url>');
     expect(stdout).toContain(version);
   });
 
