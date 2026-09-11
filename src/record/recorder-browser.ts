@@ -14,6 +14,12 @@ export const RECORDER_SOURCE = `
 
   const isStopButton = (el) => !!(el && el.closest && el.closest('[data-flowreel-stop]'));
 
+  // One shared list of "this is clickable" for both the label lookup and the
+  // recorded box - they used to drift, which meant a click on an icon inside a
+  // <summary> recorded the summary's label but the icon's tiny box.
+  const CLICKABLE = 'button, a, [role="button"], input[type="submit"], input[type="button"], summary';
+  const BUTTON_SELECTOR = 'button, input[type="submit"], input[type="button"], [role="button"]';
+
   const cssEscape = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : s;
 
   const cssPath = (el) => {
@@ -32,15 +38,52 @@ export const RECORDER_SOURCE = `
 
   const shortText = (el) => {
     const raw = el.innerText != null ? el.innerText : (el.textContent || '');
+    // The whitespace collapse below already removes every newline, so a
+    // separate "no newline" check afterward can never fire.
     const text = (raw || el.value || el.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim();
-    return text.length > 0 && text.length <= MAX_TEXT && !text.includes('\\n') ? text : '';
+    return text.length > 0 && text.length <= MAX_TEXT ? text : '';
   };
 
+  // Bare text is only safe to emit when the resolver's own lookup strategy
+  // (getByRole('button', exact) for button-like things, getByText(exact)
+  // otherwise) would land on exactly one element - otherwise replay picks
+  // whichever match happens to come first in the DOM, which may not be this one.
+  const isButtonLike = (el) => el.matches(BUTTON_SELECTOR);
+
+  const countButtonMatches = (label) => {
+    const all = document.querySelectorAll(BUTTON_SELECTOR);
+    let count = 0;
+    for (let i = 0; i < all.length; i++) if (shortText(all[i]) === label) count++;
+    return count;
+  };
+
+  // Mirrors getByText(exact): count elements whose *own* text equals the
+  // label, skipping an element that merely contains a descendant with the
+  // same exact text (that descendant is the real match, not its ancestor).
+  const countTextMatches = (label) => {
+    const all = document.querySelectorAll('*');
+    let count = 0;
+    for (let i = 0; i < all.length; i++) {
+      const el = all[i];
+      if (shortText(el) !== label) continue;
+      const descendants = el.querySelectorAll('*');
+      let hasMatchingDescendant = false;
+      for (let j = 0; j < descendants.length; j++) {
+        if (shortText(descendants[j]) === label) { hasMatchingDescendant = true; break; }
+      }
+      if (!hasMatchingDescendant) count++;
+    }
+    return count;
+  };
+
+  const isTextUnique = (clickable, label) =>
+    (isButtonLike(clickable) ? countButtonMatches(label) : countTextMatches(label)) === 1;
+
   const describe = (el) => {
-    const clickable = el.closest('button, a, [role="button"], input[type="submit"], input[type="button"], summary');
+    const clickable = el.closest(CLICKABLE);
     const target = clickable || el;
     const label = shortText(target);
-    if (clickable && label) return { target: label, label: label };
+    if (clickable && label && isTextUnique(clickable, label)) return { target: label, label: label };
     if (target.id) return { target: '#' + cssEscape(target.id), label: label };
     const name = target.getAttribute('name');
     if (name) return { target: target.tagName.toLowerCase() + '[name="' + name + '"]', label: label };
@@ -72,7 +115,7 @@ export const RECORDER_SOURCE = `
     if (isTextField(el)) return; // focusing a field is not a demo step; typing into it is
     flushInput();
     const d = describe(el);
-    send({ type: 'click', target: d.target, label: d.label, box: boxOf(el.closest('button, a, [role="button"]') || el), at: now() });
+    send({ type: 'click', target: d.target, label: d.label, box: boxOf(el.closest(CLICKABLE) || el), at: now() });
   }, true);
 
   document.addEventListener('input', (e) => {
@@ -119,7 +162,10 @@ export const RECORDER_SOURCE = `
     if (document.querySelector('[data-flowreel-stop]')) return;
     const host = document.createElement('div');
     host.setAttribute('data-flowreel-stop', '');
-    host.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483647;';
+    // Top-centre, not a corner: real apps put toasts and notifications in
+    // corners (this demo's own toast sits at right:26px;bottom:26px), so a
+    // recorder that camps in a corner risks covering the app's own feedback.
+    host.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:2147483647;';
     const root = host.attachShadow({ mode: 'closed' });
     root.innerHTML =
       '<style>' +
