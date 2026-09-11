@@ -22,6 +22,14 @@ export const RECORDER_SOURCE = `
 
   const cssEscape = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : s;
 
+  // Escapes a value going inside a double-quoted CSS attribute selector
+  // (tag[name="..."]), same order as serialize.ts's quote(): backslash first,
+  // then the quote itself, so a value like Say "hi" cannot break out of the
+  // selector's quotes. Every backslash below is doubled because this whole
+  // file is itself one big template literal - each \\\\ here is one literal
+  // backslash by the time this code runs in the browser.
+  const escapeAttr = (s) => s.replace(/\\\\/g, '\\\\\\\\').replace(/"/g, '\\\\"');
+
   const cssPath = (el) => {
     const parts = [];
     let node = el;
@@ -86,9 +94,9 @@ export const RECORDER_SOURCE = `
     if (clickable && label && isTextUnique(clickable, label)) return { target: label, label: label };
     if (target.id) return { target: '#' + cssEscape(target.id), label: label };
     const name = target.getAttribute('name');
-    if (name) return { target: target.tagName.toLowerCase() + '[name="' + name + '"]', label: label };
+    if (name) return { target: target.tagName.toLowerCase() + '[name="' + escapeAttr(name) + '"]', label: label };
     const placeholder = target.getAttribute('placeholder');
-    if (placeholder) return { target: target.tagName.toLowerCase() + '[placeholder="' + placeholder + '"]', label: label };
+    if (placeholder) return { target: target.tagName.toLowerCase() + '[placeholder="' + escapeAttr(placeholder) + '"]', label: label };
     return { target: cssPath(target), label: label };
   };
 

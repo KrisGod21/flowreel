@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildScript, polishEvent } from '../../src/record/build.js';
+import { UserError } from '../../src/errors.js';
 import type { RecordedSession, InteractionEvent } from '../../src/record/events.js';
 
 const viewport = { width: 1280, height: 800 };
@@ -89,6 +90,12 @@ describe('buildScript (raw)', () => {
 
   it('rejects a session with no navigation', () => {
     expect(() => buildScript(session([]))).toThrow(/nothing was recorded/i);
+  });
+
+  it('throws a UserError naming the type for an event it does not know how to build', () => {
+    const bogus = { type: 'bogus', at: 1000 } as unknown as InteractionEvent;
+    expect(() => buildScript(session([{ type: 'navigate', url: 'http://x/', title: 'X', at: 0 }, bogus]))).toThrow(UserError);
+    expect(() => buildScript(session([{ type: 'navigate', url: 'http://x/', title: 'X', at: 0 }, bogus]))).toThrow(/bogus/);
   });
 });
 

@@ -84,6 +84,30 @@ describe('selector generation', () => {
     // Whatever it produced must resolve back to exactly one element.
     expect(await page.locator(d.target).count()).toBe(1);
   });
+
+  it('escapes a quote in a placeholder value so the fallback selector stays valid', async () => {
+    await page.evaluate(() => {
+      const input = document.createElement('input');
+      input.placeholder = 'Say "hi"';
+      input.className = 'quote-test-input';
+      document.body.appendChild(input);
+    });
+
+    const d = await describeEl('.quote-test-input');
+    expect(await page.locator(d.target).count()).toBe(1);
+
+    // Prove the escaping actually discriminates: the old, unescaped way of
+    // building this same selector produces malformed CSS that page.locator
+    // rejects outright, rather than a selector that merely resolves wrong.
+    const unescapedSelector = 'input[placeholder="Say "hi""]';
+    let thrown: unknown;
+    try {
+      await page.locator(unescapedSelector).count();
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+  });
 });
 
 describe('capture', () => {

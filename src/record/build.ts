@@ -35,6 +35,13 @@ function actionFor(event: InteractionEvent): Command[] {
           amount: Math.abs(Math.round(event.deltaY)),
         },
       ];
+    default:
+      // Second line of defence: session.ts validates events at the
+      // exposeFunction boundary, so this should be unreachable in practice.
+      // If it is ever reached anyway (a new event type added to one side and
+      // not the other), fail with plain language instead of `[...undefined]`
+      // throwing a raw TypeError.
+      throw new UserError(`Recording contains an event type I don't know how to build: ${(event as { type: string }).type}`);
   }
 }
 

@@ -2,7 +2,39 @@ import { chromium, type Page } from 'playwright';
 import { resolveBrowser, launchOptionsFor, systemProbe } from '../browser/resolve.js';
 import { UserError } from '../errors.js';
 import { RECORDER_SOURCE } from './recorder-browser.js';
-import type { InteractionEvent, RecordedSession } from './events.js';
+import type { Box, InteractionEvent, RecordedSession } from './events.js';
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isValidBox(value: unknown): value is Box {
+  if (typeof value !== 'object' || value === null) return false;
+  const box = value as Record<string, unknown>;
+  return isFiniteNumber(box.x) && isFiniteNumber(box.y) && isFiniteNumber(box.width) && isFiniteNumber(box.height);
+}
+
+// The page can call __flowreelEvent with anything - it's a page-visible
+// global, reachable by the site's own scripts, not just the recorder we
+// inject. Validate the shape here, at the boundary, rather than trusting it
+// downstream: a hostile or buggy page must not be able to abort a recording.
+function isValidEvent(value: unknown): value is InteractionEvent {
+  if (typeof value !== 'object' || value === null) return false;
+  const event = value as Record<string, unknown>;
+  if (!isFiniteNumber(event.at)) return false;
+  switch (event.type) {
+    case 'click':
+      return typeof event.target === 'string' && typeof event.label === 'string' && isValidBox(event.box);
+    case 'input':
+      return typeof event.target === 'string' && typeof event.value === 'string' && isValidBox(event.box);
+    case 'press':
+      return typeof event.key === 'string';
+    case 'scroll':
+      return isFiniteNumber(event.deltaY);
+    default:
+      return false;
+  }
+}
 
 export interface SessionOptions {
   /** Default false: the user has to see the browser to click through it. */
@@ -62,11 +94,26 @@ export async function recordSession(url: string, options: SessionOptions = {}): 
     const page = await browser.newPage();
     await page.setViewportSize(viewport);
 
-    await page.exposeFunction('__flowreelEvent', (event: InteractionEvent) => {
+    await page.exposeFunction('__flowreelEvent', (event: unknown) => {
+      if (!isValidEvent(event)) return;
       events.push({ ...event, at: pageEpoch + event.at });
     });
     await page.exposeFunction('__flowreelStop', () => resolveStop());
     await page.addInitScript(RECORDER_SOURCE);
+
+    // The recorder is injected per page, so a target="_blank" link,
+    // window.open, or an OAuth popup opens a fresh Page with no recorder and
+    // no Stop button - everything done there vanishes silently. The .reel
+    // language has no tab switching, so recording the new tab would replay
+    // wrongly; the honest v1 is to warn once and let the user come back.
+    let warnedAboutNewTab = false;
+    page.context().on('page', () => {
+      if (warnedAboutNewTab) return;
+      warnedAboutNewTab = true;
+      process.stderr.write(
+        'A new tab opened. flowreel records only the tab it started in - switch back to it to keep recording, and press Stop there.\n',
+      );
+    });
 
     page.on('load', () => {
       // Runs for the first document and every navigation after it.
