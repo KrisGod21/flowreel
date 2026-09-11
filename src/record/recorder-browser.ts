@@ -114,5 +114,29 @@ export const RECORDER_SOURCE = `
   window.addEventListener('pagehide', flushInput);
 
   window.__flowreelRecorder = { describe: describe, flush: flushInput };
+
+  const mountStop = () => {
+    if (document.querySelector('[data-flowreel-stop]')) return;
+    const host = document.createElement('div');
+    host.setAttribute('data-flowreel-stop', '');
+    host.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483647;';
+    const root = host.attachShadow({ mode: 'closed' });
+    root.innerHTML =
+      '<style>' +
+      'button{all:initial;cursor:pointer;font:600 14px ui-sans-serif,system-ui,sans-serif;color:#fff;' +
+      'background:#e5484d;padding:10px 16px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.35);' +
+      'display:inline-flex;align-items:center;gap:8px}' +
+      'button:hover{background:#d13b40}' +
+      'i{width:10px;height:10px;border-radius:50%;background:#fff;display:inline-block}' +
+      '</style>' +
+      '<button type="button"><i></i>Stop recording</button>';
+    root.querySelector('button').addEventListener('click', (e) => {
+      e.stopPropagation();
+      try { window.__flowreelStop(); } catch (err) {}
+    });
+    (document.body || document.documentElement).appendChild(host);
+  };
+  if (document.body) mountStop();
+  else document.addEventListener('DOMContentLoaded', mountStop, { once: true });
 })();
 `;

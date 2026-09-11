@@ -97,3 +97,28 @@ describe('capture', () => {
     for (const e of events) expect(typeof e.at).toBe('number');
   });
 });
+
+describe('stop button', () => {
+  it('is present, clickable, and calls __flowreelStop', async () => {
+    let stopped = false;
+    await page.exposeFunction('__flowreelStop', () => { stopped = true; });
+    await page.reload();
+
+    const host = page.locator('[data-flowreel-stop]');
+    expect(await host.count()).toBe(1);
+    await host.click();
+    expect(stopped).toBe(true);
+  });
+
+  it('does not record its own click', async () => {
+    await page.exposeFunction('__flowreelStop', () => {});
+    await page.reload();
+    await page.locator('[data-flowreel-stop]').click();
+    expect(events.filter((e) => e.type === 'click')).toHaveLength(0);
+  });
+
+  it('does not steal clicks from the app', async () => {
+    await page.click('#new-project');
+    await expect(page.locator('#modal')).toBeVisible();
+  });
+});
