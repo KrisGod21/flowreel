@@ -1,9 +1,10 @@
 import { chromium } from 'playwright';
+import type { Page } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { parse } from './parser/parse.js';
 import { resolveBrowser, launchOptionsFor, systemProbe } from './browser/resolve.js';
-import { executeScript } from './runtime/execute.js';
+import { executeScript, visit } from './runtime/execute.js';
 import { startScreencast } from './capture/screencast.js';
 import { Overlay } from './overlay/api.js';
 import { trimIdle } from './capture/trim.js';
@@ -12,8 +13,8 @@ import { PRESETS } from './encode/presets.js';
 import type { OutputFormat, OutputSpec, Preset } from './encode/presets.js';
 import { UserError } from './errors.js';
 import type { EmittedOutput } from './summary.js';
-import type { Frame } from './capture/types.js';
-import type { Script } from './parser/types.js';
+import type { Frame, FrameSet } from './capture/types.js';
+import type { Command, Script } from './parser/types.js';
 
 const IDLE_THRESHOLD_MS = 500;
 
@@ -95,6 +96,47 @@ export function initialViewport(script: Script): { width: number; height: number
   return command?.kind === 'viewport' ? { width: command.width, height: command.height } : undefined;
 }
 
+// The screencast is started before the script runs (see startScreencast's own
+// warm-up nudge), so a script whose first real command is `visit` records its
+// opening frames against about:blank - a measured 3 frames of pure white at
+// 15fps before the app ever appears, in the flagship artifact. `viewport` is
+// hoisted the same way above, so a leading `visit` gets the same treatment:
+// navigate before the screencast starts, so its warm-up nudge fires against
+// the real, loaded page instead of about:blank. Only a genuinely *leading*
+// visit qualifies (skipping past any leading `viewport`, which does not
+// change the document) - a `visit` reached later in the script, after other
+// commands have already run, must still happen mid-capture like today.
+export function initialVisit(script: Script): string | undefined {
+  const leading = script.commands.find((c) => c.kind !== 'viewport');
+  return leading?.kind === 'visit' ? leading.url : undefined;
+}
+
+// Drops the one leading `visit` that was already executed ahead of the
+// screencast by initialVisit, so executeScript does not navigate to it a
+// second time. Unlike `viewport` - where re-applying the same size mid-script
+// is a harmless no-op - re-running `visit` is not harmless: it would force a
+// real second navigation after recording has already begun, reproducing the
+// very blank-frame flash this hoist exists to remove, just moved a few frames
+// later instead of eliminated.
+function dropLeadingVisit(script: Script): Script {
+  const index = script.commands.findIndex((c) => c.kind !== 'viewport');
+  if (index === -1 || script.commands[index]?.kind !== 'visit') return script;
+  const commands: Command[] = script.commands.filter((_, i) => i !== index);
+  return { ...script, commands };
+}
+
+// Pulled out of runScript so the blank-first-frame fix can be exercised
+// directly against a real page and a real screencast, without paying for
+// ffmpeg encoding on every assertion.
+export async function captureFrames(page: Page, script: Script, overlay?: Overlay): Promise<FrameSet> {
+  const leadingVisitUrl = initialVisit(script);
+  if (leadingVisitUrl) await visit(page, leadingVisitUrl);
+
+  const screencast = await startScreencast(page, { alreadyNavigated: leadingVisitUrl !== undefined });
+  await executeScript(page, leadingVisitUrl ? dropLeadingVisit(script) : script, overlay);
+  return screencast.stop();
+}
+
 export async function runScript(source: string, options: RunOptions): Promise<EmittedOutput[]> {
   const script = parse(source);
 
@@ -131,12 +173,11 @@ export async function runScript(source: string, options: RunOptions): Promise<Em
     if (viewport) await page.setViewportSize(viewport);
 
     // Installed before the screencast so the first captured frame already has
-    // the overlay, and before any visit so addInitScript covers every document.
+    // the overlay, and before any visit (including the hoisted one inside
+    // captureFrames) so addInitScript covers every document.
     const overlay = await Overlay.install(page);
 
-    const screencast = await startScreencast(page);
-    await executeScript(page, script, overlay);
-    const frameSet = await screencast.stop();
+    const frameSet = await captureFrames(page, script, overlay);
 
     const frames = trimIdle(frameSet.frames, IDLE_THRESHOLD_MS);
     assertFramesCaptured(frames);

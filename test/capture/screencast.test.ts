@@ -68,3 +68,40 @@ describe('startScreencast', () => {
     expect(frames.length).toBeGreaterThan(0);
   });
 });
+
+// The leading-`visit` hoist in run.ts (fix for recordings opening on a blank
+// frame) navigates the page *before* calling startScreencast, then tells it
+// so via `alreadyNavigated`. These two tests pin the exact mechanism that
+// makes that fix work, deterministically - no real Chrome timing involved,
+// unlike the "measured 3 blank frames on a real recording" symptom, which
+// depends on real navigation latency and isn't reliably reproducible against
+// a fast local fixture (confirmed by hand: reverting the run.ts hoist alone
+// did not flip a real-browser version of this assertion, because Chrome's own
+// warm-up latency already happens to swallow the sole blank frame for a
+// fast navigation - see the task report for that finding). Reverting either
+// half of the actual code change - dropping the `alreadyNavigated` branch, or
+// not passing the option true - makes exactly one of these two fail.
+describe('startScreencast alreadyNavigated', () => {
+  it('keeps the warm-up frame instead of discarding it when the page was already navigated', async () => {
+    const cdp = new FakeCdpSession();
+    const page = makeFakePage(cdp);
+
+    const screencast = await startScreencast(page, { alreadyNavigated: true });
+    const { frames } = await screencast.stop();
+
+    // This fake page's only source of a frame at all is the warm-up
+    // `evaluate` call inside startScreencast - so if this frame were
+    // discarded (the default, about:blank behaviour), frames would be empty.
+    expect(frames).toHaveLength(1);
+  });
+
+  it('discards that same warm-up frame by default, matching the about:blank case', async () => {
+    const cdp = new FakeCdpSession();
+    const page = makeFakePage(cdp);
+
+    const screencast = await startScreencast(page);
+    const { frames } = await screencast.stop();
+
+    expect(frames).toHaveLength(0);
+  });
+});

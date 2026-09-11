@@ -27,6 +27,12 @@ const WAIT_TARGET_TIMEOUT_MS = 30_000;
 // one sentence that actually tells the user what to do.
 const UNREACHABLE = ['ERR_CONNECTION_REFUSED', 'ERR_NAME_NOT_RESOLVED'];
 
+// A `visit` target that is not a URL at all (a typo'd placeholder like
+// `__APP__`, or a bare word) fails at the CDP layer rather than DNS, with its
+// own distinct wording - matched verbatim against what Playwright actually
+// produces, not guessed.
+const INVALID_URL = 'Cannot navigate to invalid URL';
+
 function hostLabel(url: string): string {
   try {
     return new URL(url).host || url;
@@ -35,11 +41,19 @@ function hostLabel(url: string): string {
   }
 }
 
-async function visit(page: Page, url: string): Promise<void> {
+// Exported so run.ts's leading-`visit` hoist (defect: recordings opening on a
+// blank frame) can share this exact translation instead of letting a raw
+// Playwright error escape from that separate call site.
+export async function visit(page: Page, url: string): Promise<void> {
   try {
     await page.goto(url, { waitUntil: 'load' });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (message.includes(INVALID_URL)) {
+      throw new UserError(
+        `"${url}" isn't a URL I can open. Use something like http://localhost:3000, or a file:// path to an HTML file.`,
+      );
+    }
     if (UNREACHABLE.some((code) => message.includes(code))) {
       throw new UserError(
         `Nothing is running at ${hostLabel(url)} — start your dev server first, maybe \`npm run dev\`?`,

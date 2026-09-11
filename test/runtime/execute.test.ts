@@ -4,10 +4,11 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { resolveBrowser, launchOptionsFor, systemProbe } from '../../src/browser/resolve.js';
-import { executeScript, TargetNotFoundError } from '../../src/runtime/execute.js';
+import { executeScript, visit, TargetNotFoundError } from '../../src/runtime/execute.js';
 import { resolveTarget } from '../../src/runtime/targets.js';
 import { startScreencast } from '../../src/capture/screencast.js';
 import { parse } from '../../src/parser/parse.js';
+import { UserError } from '../../src/errors.js';
 
 const FIXTURE = pathToFileURL(resolve('test/fixtures/app/index.html')).href;
 const DELAYED_FIXTURE = pathToFileURL(resolve('test/fixtures/app/delayed.html')).href;
@@ -57,6 +58,59 @@ describe('executeScript', () => {
     expect((err as Error).message).toContain('Sign in');
     expect((err as Error).message).toContain('Register');
     expect((err as Error).message).not.toContain('Hidden decoy');
+  });
+});
+
+describe('visit', () => {
+  // Both cases here fail the navigation itself (an invalid URL, a refused
+  // connection), which can leave a page's navigation state in a way that
+  // bleeds into whatever `page.goto` a later test issues on the same page
+  // (observed as spurious "interrupted by another navigation" errors) - so
+  // each gets its own throwaway page rather than the shared one other tests
+  // in this file depend on.
+
+  // Playwright reports a non-URL `visit` target with a raw CDP call log
+  // ("page.goto: Protocol error (Page.navigate): Cannot navigate to invalid
+  // URL", followed by a "Call log:" block) at exit code 2 - a stack trace
+  // standing in for the error message, for a mistake (a typo'd placeholder
+  // like `__APP__`) that users will actually make. It must instead surface as
+  // a plain-language UserError, matching the real ERR_CONNECTION_REFUSED /
+  // ERR_NAME_NOT_RESOLVED translation already covered below.
+  it('translates an invalid visit URL into plain language, not a raw call log', async () => {
+    const freshPage = await browser.newPage();
+    try {
+      let err: unknown;
+      try {
+        await visit(freshPage, '__APP__');
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(UserError);
+      expect((err as Error).message).toBe(
+        '"__APP__" isn\'t a URL I can open. Use something like http://localhost:3000, or a file:// path to an HTML file.',
+      );
+    } finally {
+      await freshPage.close();
+    }
+  });
+
+  it('still translates an unreachable dev server, not just an invalid URL', async () => {
+    const freshPage = await browser.newPage();
+    try {
+      let err: unknown;
+      try {
+        // Port 1 is on Chrome's restricted-port list and fails with
+        // ERR_UNSAFE_PORT instead of the DNS/connection failure this is
+        // meant to exercise, so use an ordinary high port nothing listens on.
+        await visit(freshPage, 'http://127.0.0.1:39999');
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(UserError);
+      expect((err as Error).message).toContain('Nothing is running at');
+    } finally {
+      await freshPage.close();
+    }
   });
 });
 

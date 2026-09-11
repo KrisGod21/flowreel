@@ -1,14 +1,20 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdir, rm, stat } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { chromium, type Browser, type Page } from 'playwright';
+import { createHash } from 'node:crypto';
 import {
   runScript,
   assertFramesCaptured,
   EmptyCaptureError,
   planOutputs,
   initialViewport,
+  initialVisit,
+  captureFrames,
 } from '../src/run.js';
+import { resolveBrowser, launchOptionsFor, systemProbe } from '../src/browser/resolve.js';
+import { startScreencast } from '../src/capture/screencast.js';
 import { PRESETS } from '../src/encode/presets.js';
 import { UserError } from '../src/errors.js';
 import { parse } from '../src/parser/parse.js';
@@ -133,6 +139,95 @@ describe('initialViewport', () => {
 
   it('returns undefined when the script never sets one', () => {
     expect(initialViewport(parse('visit http://x'))).toBeUndefined();
+  });
+});
+
+describe('initialVisit', () => {
+  it('finds a leading visit, skipping past a leading viewport', () => {
+    expect(initialVisit(parse('viewport 800x600\nvisit http://x'))).toBe('http://x');
+  });
+
+  it('finds a leading visit with no viewport at all', () => {
+    expect(initialVisit(parse('visit http://x\nwait 100'))).toBe('http://x');
+  });
+
+  it('returns undefined when visit is not the first real command', () => {
+    expect(initialVisit(parse('wait 100\nvisit http://x'))).toBeUndefined();
+  });
+
+  it('returns undefined when the script never visits', () => {
+    expect(initialVisit(parse('viewport 800x600'))).toBeUndefined();
+  });
+});
+
+describe('captureFrames (blank-first-frame fix)', () => {
+  let browser: Browser;
+
+  beforeAll(async () => {
+    const choice = await resolveBrowser(systemProbe);
+    browser = await chromium.launch({ ...launchOptionsFor(choice), headless: true });
+  });
+
+  afterAll(async () => {
+    await browser?.close();
+  });
+
+  const hash = (data: Buffer) => createHash('sha256').update(data).digest('hex');
+
+  async function newSizedPage(): Promise<Page> {
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: 800, height: 600 });
+    return page;
+  }
+
+  // Before the fix, the screencast starts on about:blank and only then does
+  // the script's leading `visit` navigate - so the first captured frame (and,
+  // measured on a real recording, the first 3 frames at 15fps) is pure white.
+  // A cheap, deterministic way to prove the first frame is the *loaded* app
+  // rather than that blank warm-up frame: capture a page that has genuinely
+  // never navigated (still about:blank) through the very same "keep the
+  // first frame" path startScreencast's alreadyNavigated option uses for the
+  // real hoist, and assert the visited script's first frame is not
+  // byte-identical to that known-blank reference. (A script with no `visit`
+  // at all is not a usable reference here: with nothing ever repainting
+  // about:blank, the ordinary discard-the-first-frame path correctly ends up
+  // with zero frames, not a blank one to compare against.) Reverting the
+  // hoist in captureFrames makes this fail - see the task report for that run.
+  it('captures the loaded page in the first frame, not a blank warm-up frame', async () => {
+    const visitPage = await newSizedPage();
+    const blankPage = await newSizedPage();
+    try {
+      const visited = await captureFrames(visitPage, parse(`visit ${FIXTURE}\nwait 300`));
+      expect(visited.frames.length).toBeGreaterThan(0);
+
+      const blankScreencast = await startScreencast(blankPage, { alreadyNavigated: true });
+      const blankFrameSet = await blankScreencast.stop();
+      expect(blankFrameSet.frames.length).toBeGreaterThan(0);
+
+      expect(hash(visited.frames[0]!.data)).not.toBe(hash(blankFrameSet.frames[0]!.data));
+    } finally {
+      await visitPage.close();
+      await blankPage.close();
+    }
+  });
+
+  // The hoisted `visit` must not run a second time when executeScript runs
+  // the rest of the script - a repeated navigation after recording has begun
+  // would itself flash blank, just moved a few frames later, not eliminated.
+  // A script with exactly one `visit` and nothing else that navigates should
+  // therefore fire the page's 'load' event exactly once for the whole capture.
+  it('does not re-navigate the hoisted visit when the script executes', async () => {
+    const page = await newSizedPage();
+    let loadCount = 0;
+    page.on('load', () => {
+      loadCount += 1;
+    });
+    try {
+      await captureFrames(page, parse(`visit ${FIXTURE}\nwait 300`));
+      expect(loadCount).toBe(1);
+    } finally {
+      await page.close();
+    }
   });
 });
 

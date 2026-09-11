@@ -15,6 +15,7 @@ beforeAll(async () => {
   await mkdir(SCRATCH, { recursive: true });
   await writeFile(resolve(SCRATCH, 'broken.reel'), 'frobnicate the widget\n', 'utf8');
   await writeFile(resolve(SCRATCH, 'fine.reel'), 'visit http://localhost:1\n', 'utf8');
+  await writeFile(resolve(SCRATCH, 'invalid-url.reel'), 'visit __APP__\n', 'utf8');
 
   vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
     stdout += String(chunk);
@@ -74,6 +75,20 @@ describe('main', () => {
     expect(code).toBe(1);
     expect(stderr).toContain('bogus');
     expect(stderr).toContain('github-readme');
+  });
+
+  // Regression for the raw Playwright call log ("page.goto: Protocol error
+  // (Page.navigate): Cannot navigate to invalid URL" / "Call log: ...") that
+  // used to escape to exit code 2 for a script with a non-URL `visit` target -
+  // exactly the mistake a typo'd placeholder like `__APP__` produces.
+  it('reports an invalid visit URL as a plain-language user error, not a call log', async () => {
+    stderr = '';
+    const code = await main([resolve(SCRATCH, 'invalid-url.reel')]);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("isn't a URL I can open");
+    expect(stderr).not.toContain('Call log');
+    expect(stderr).not.toContain('Protocol error');
   });
 
   it('reports --preset with no value in plain language', async () => {

@@ -15,12 +15,41 @@ export interface Screencast {
 // bounded timeout) before returning control.
 const WARMUP_TIMEOUT_MS = 2000;
 
-export async function startScreencast(page: Page): Promise<Screencast> {
+export interface ScreencastOptions {
+  // Set when the caller already navigated the page before calling
+  // startScreencast - the leading-`visit` hoist in run.ts, added so a
+  // recording doesn't open on a blank about:blank frame. In the normal
+  // (false) case the very first frame this session ever produces is a
+  // throwaway - the page is still about:blank - and is rightly discarded.
+  // But when the page was already navigated first, that first frame *is* the
+  // real, loaded page, not a throwaway: keep it instead of discarding it.
+  //
+  // A forced second repaint cannot substitute for this: Chrome's screencast
+  // only emits a frame when a compositor commit actually changes pixels, and
+  // the warm-up nudge (a colorScheme toggle with no visible effect on an
+  // ordinary page) reliably produces exactly one frame right after the
+  // session is enabled, then nothing more - confirmed by hand against a real
+  // page, repeating the same nudge for several seconds produced no further
+  // frames. So there is no reliable way to manufacture a *second* frame of
+  // identical, unchanging content; the fix is to stop discarding the first
+  // one when it is already real.
+  alreadyNavigated?: boolean;
+}
+
+async function forceRepaint(page: Page): Promise<void> {
+  await page
+    .evaluate(() => {
+      document.documentElement.style.colorScheme = document.documentElement.style.colorScheme ? '' : 'normal';
+    })
+    .catch(() => {});
+}
+
+export async function startScreencast(page: Page, options: ScreencastOptions = {}): Promise<Screencast> {
   const client = await page.context().newCDPSession(page);
   const frames: Frame[] = [];
   let startedAt = Date.now();
-  let warmedUp = false;
-  let onWarm: (() => void) | undefined;
+  let firstFrameSeen = false;
+  let onFirstFrame: (() => void) | undefined;
 
   const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
 
@@ -29,9 +58,16 @@ export async function startScreencast(page: Page): Promise<Screencast> {
       // The session can close mid-flight; a dropped ack is not fatal.
     });
 
-    if (!warmedUp) {
-      warmedUp = true;
-      onWarm?.();
+    if (!firstFrameSeen) {
+      firstFrameSeen = true;
+      // alreadyNavigated: this first frame already depicts the real, loaded
+      // page - keep it (timestamp 0, exactly like the "first frame" any other
+      // capture starts from). Otherwise it is the classic about:blank
+      // throwaway and is discarded, as before.
+      if (options.alreadyNavigated) {
+        frames.push({ data: Buffer.from(event.data, 'base64'), timestampMs: 0 });
+      }
+      onFirstFrame?.();
       return;
     }
 
@@ -42,12 +78,12 @@ export async function startScreencast(page: Page): Promise<Screencast> {
   });
 
   // Constructed before Page.startScreencast is sent: if a frame arrived
-  // during that await with onWarm not yet assigned, the handler's discard
-  // branch would latch warmedUp = true but have no resolver to call, so
+  // during that await with onFirstFrame not yet assigned, the handler above
+  // would latch firstFrameSeen = true but have no resolver to call, so
   // `warmup` below would never settle and every capture would stall for the
   // full timeout - with frames straddling the startedAt reset out of order.
-  const warmup = new Promise<void>((resolveWarm) => {
-    onWarm = resolveWarm;
+  const warmup = new Promise<void>((resolve) => {
+    onFirstFrame = resolve;
   });
 
   await client.send('Page.startScreencast', {
@@ -59,16 +95,14 @@ export async function startScreencast(page: Page): Promise<Screencast> {
   // Best-effort nudge: a style write forces a compositor frame even on a
   // blank page, so the warm-up frame arrives promptly instead of waiting for
   // whatever the caller's script happens to do first.
-  await page
-    .evaluate(() => {
-      document.documentElement.style.colorScheme = document.documentElement.style.colorScheme ? '' : 'normal';
-    })
-    .catch(() => {});
+  await forceRepaint(page);
   await Promise.race([
     warmup,
     new Promise<void>((resolveTimeout) => setTimeout(resolveTimeout, WARMUP_TIMEOUT_MS)),
   ]);
-  warmedUp = true;
+  // Rebase timestamps to this point so a slow warm-up doesn't inflate every
+  // frame's reported time. In alreadyNavigated mode the first frame was
+  // already pushed above with timestampMs: 0, matching this same rebase.
   startedAt = Date.now();
 
   // The nudge above only ever fires on the document that happened to be
@@ -79,14 +113,11 @@ export async function startScreencast(page: Page): Promise<Screencast> {
   // repaint something), the capture window can close with zero frames. Once
   // warm-up is done every subsequent `load` is a real navigation, so re-run
   // the same best-effort nudge each time one fires - the resulting frame is
-  // a genuine frame of the new document and is kept, not discarded. Must
-  // never throw: the page can be mid-navigation or mid-teardown.
+  // a genuine frame of the new document and is kept, not discarded (by this
+  // point firstFrameSeen is always true, so the handler above never discards
+  // again). Must never throw: the page can be mid-navigation or mid-teardown.
   page.on('load', () => {
-    void page
-      .evaluate(() => {
-        document.documentElement.style.colorScheme = document.documentElement.style.colorScheme ? '' : 'normal';
-      })
-      .catch(() => {});
+    void forceRepaint(page);
   });
 
   return {
