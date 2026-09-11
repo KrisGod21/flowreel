@@ -1,4 +1,4 @@
-# flowreel example — start your dev server, then: npx flowreel examples/demo.reel
+# flowreel example - start your dev server, then: npx flowreel examples/demo.reel
 # Every selector below is a PLACEHOLDER - swap in real ones from your app.
 # zoom/highlight now throw after a 5s search rather than doing nothing, so a
 # missing target stalls and aborts instead of silently skipping.

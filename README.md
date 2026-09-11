@@ -27,10 +27,18 @@ flowreel replaces that with a short, readable script. It drives a real browser, 
 ## Quick start
 
 ```bash
+npx flowreel record http://localhost:3000
+```
+
+A browser opens. Click through the feature you want to show, type what you'd type, and press **Stop recording**. flowreel writes `demo.reel` (the script that reproduces what you did, with captions and zooms added), then renders `demo.gif` and `demo.mp4` from it.
+
+Don't like a caption? Edit `demo.reel` and re-run it:
+
+```bash
 npx flowreel demo.reel
 ```
 
-With a `demo.reel` like this:
+Or write a script by hand from the start. With a `demo.reel` like this:
 
 ```
 visit http://localhost:3000
@@ -105,6 +113,12 @@ If an output can't meet its budget, flowreel lowers the framerate, then the widt
 npx flowreel demo.reel --preset twitter   # the flag wins over the script's own output line
 ```
 
+## How recording works
+
+flowreel does not record video and post-process it. It captures *what you did* - each click, what you typed, where you scrolled - as a script, then replays that script through the same renderer that draws the cursor, ripples and captions. That's why the output is pixel-perfect, and why you can edit and re-run it when your UI changes.
+
+The tradeoff: it records a browser tab flowreel opens, not your whole screen or other apps.
+
 ## Why a GIF?
 
 Because it's the only format that autoplays inline in a GitHub README from a file in your own repo. MP4 and WebM have to be uploaded through GitHub's web editor, live outside your repository, and don't loop - which also means a CI job can't regenerate them. GIF is a bad format and flowreel treats it as one: palette-optimised, budgeted, and paired with an MP4 for everywhere else.
@@ -120,9 +134,8 @@ npm run demo
 
 ## Status
 
-**v0.1 - early, working, and used to make its own README.** The scripting, capture, polish layer and encoder are complete and tested (140+ tests, run against a real browser and real ffmpeg). What's next:
+**v0.1 - early, working, and used to make its own README.** The scripting, capture, polish layer, `flowreel record`, and encoder are complete and tested (200+ tests, run against a real browser and real ffmpeg). Auto-polish is deterministic: zoom on narrow inputs, captions from your app's own button labels and page titles. No API key. What's next:
 
-- **`flowreel record`** - click through your app once and get the `.reel` script written for you. This is the headline feature and it's next.
 - **Framing** - browser chrome, device frames, rounded corners and a backdrop.
 - **A GitHub Action** that regenerates your demo on every release, so the README never shows a stale UI.
 - **Animated WebP** for the README once its rendering on npm's package page is verified - it's ~5x smaller than GIF at full colour, and it already renders on GitHub.
