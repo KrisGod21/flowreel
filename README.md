@@ -15,7 +15,7 @@
 
 ---
 
-Every project needs a demo animation — for the README, the hackathon submission, the pull request, the launch post. Making one today means a screen recorder, a jerky real cursor, a 40&nbsp;MB file that breaks GitHub's size limit, and redoing the whole thing every time the UI changes.
+Every project needs a demo animation - for the README, the hackathon submission, the pull request, the launch post. Making one today means a screen recorder, a jerky real cursor, a 40&nbsp;MB file that breaks GitHub's size limit, and redoing the whole thing every time the UI changes.
 
 flowreel replaces that with a short, readable script. It drives a real browser, draws a **synthetic cursor** that glides between targets, marks clicks with a **ripple**, shows what it typed in a **keystroke chip**, burns in **captions**, and can **zoom** or **highlight** so small text stays legible once your animation is scaled down to README width. Then it encodes the result under a byte budget so it actually fits where it's going.
 
@@ -64,7 +64,7 @@ Requires Node 20+ and a Chrome or Edge install (or run `npx playwright install c
 
 ## The `.reel` language
 
-A script is one command per line. Targets are **visible text first** — `click "Sign in"` finds the button a human would click — with CSS selectors as the fallback when you need them. Lines starting with `#` are comments.
+A script is one command per line. Targets are **visible text first** - `click "Sign in"` finds the button a human would click - with CSS selectors as the fallback when you need them. Lines starting with `#` are comments.
 
 | command | what it does |
 |---|---|
@@ -77,7 +77,7 @@ A script is one command per line. Targets are **visible text first** — `click 
 | `scroll up\|down [px]` | scroll the page |
 | `scroll to <target>` | scroll a target into view |
 | `wait <ms>` | pause |
-| `wait idle` | wait for network idle — use after `visit` on a dev server |
+| `wait idle` | wait for network idle - use after `visit` on a dev server |
 | `wait <target>` | wait for something to appear |
 | `caption "<text>"` | burn in a caption; `caption ""` clears it |
 | `zoom <target>` / `reset zoom` | zoom toward an element and back |
@@ -99,7 +99,7 @@ Say where the demo is going. flowreel picks the format, size and byte budget.
 | `twitter` | MP4, 1280px wide | under 15&nbsp;MB |
 | `producthunt` | GIF, 1270px wide | under 3&nbsp;MB |
 
-If an output can't meet its budget, flowreel lowers the framerate, then the width, until it does — and still returns the file if it can't, rather than losing your recording over a few hundred kilobytes.
+If an output can't meet its budget, flowreel lowers the framerate, then the width, until it does - and still returns the file if it can't, rather than losing your recording over a few hundred kilobytes.
 
 ```bash
 npx flowreel demo.reel --preset twitter   # the flag wins over the script's own output line
@@ -107,7 +107,7 @@ npx flowreel demo.reel --preset twitter   # the flag wins over the script's own 
 
 ## Why a GIF?
 
-Because it's the only format that autoplays inline in a GitHub README from a file in your own repo. MP4 and WebM have to be uploaded through GitHub's web editor, live outside your repository, and don't loop — which also means a CI job can't regenerate them. GIF is a bad format and flowreel treats it as one: palette-optimised, budgeted, and paired with an MP4 for everywhere else.
+Because it's the only format that autoplays inline in a GitHub README from a file in your own repo. MP4 and WebM have to be uploaded through GitHub's web editor, live outside your repository, and don't loop - which also means a CI job can't regenerate them. GIF is a bad format and flowreel treats it as one: palette-optimised, budgeted, and paired with an MP4 for everywhere else.
 
 ## Regenerating this README's demo
 
@@ -120,12 +120,12 @@ npm run demo
 
 ## Status
 
-**v0.1 — early, working, and used to make its own README.** The scripting, capture, polish layer and encoder are complete and tested (140+ tests, run against a real browser and real ffmpeg). What's next:
+**v0.1 - early, working, and used to make its own README.** The scripting, capture, polish layer and encoder are complete and tested (140+ tests, run against a real browser and real ffmpeg). What's next:
 
-- **`flowreel record`** — click through your app once and get the `.reel` script written for you. This is the headline feature and it's next.
-- **Framing** — browser chrome, device frames, rounded corners and a backdrop.
+- **`flowreel record`** - click through your app once and get the `.reel` script written for you. This is the headline feature and it's next.
+- **Framing** - browser chrome, device frames, rounded corners and a backdrop.
 - **A GitHub Action** that regenerates your demo on every release, so the README never shows a stale UI.
-- **Animated WebP** for the README once its rendering on npm's package page is verified — it's ~5x smaller than GIF at full colour, and it already renders on GitHub.
+- **Animated WebP** for the README once its rendering on npm's package page is verified - it's ~5x smaller than GIF at full colour, and it already renders on GitHub.
 
 Design notes and every decision taken along the way live in [`docs/`](docs/).
 
@@ -137,7 +137,7 @@ npm test          # runs the full suite, including browser and ffmpeg tests
 npm run typecheck
 ```
 
-Bug reports and pull requests are welcome. If a recording comes out wrong, the `.reel` script that produced it is the perfect reproduction — please include it.
+Bug reports and pull requests are welcome. If a recording comes out wrong, the `.reel` script that produced it is the perfect reproduction - please include it.
 
 ## License
 
