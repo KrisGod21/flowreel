@@ -39,7 +39,20 @@ function actionFor(event: InteractionEvent): Command[] {
 }
 
 const CAPTION_MAX_CHARS = 40;
-const ZOOM_MAX_WIDTH_FRACTION = 0.4;
+const ZOOM_MAX_WIDTH_FRACTION = 0.3;
+
+// Real page titles are usually "Page - Brand" or "Brand | Page"; the brand
+// half is boilerplate that either clutters the caption or, combined with the
+// page half, pushes the whole thing past CAPTION_MAX_CHARS and drops the
+// caption entirely. Split on the first of these separators and keep the
+// leading segment instead.
+const TITLE_SEPARATOR = / - | \| | — | · /;
+
+/** Keeps the leading segment of a "Page - Brand" style title, trimmed. */
+function leadingTitleSegment(title: string): string {
+  const segments = title.split(TITLE_SEPARATOR).map((segment) => segment.trim());
+  return segments.find((segment) => segment.length > 0) ?? title.trim();
+}
 
 /**
  * The auto-polish seam. Pure, deterministic, no model. Returns commands to
@@ -52,7 +65,7 @@ export function polishEvent(
 ): { before: Command[]; after: Command[] } {
   switch (event.type) {
     case 'navigate':
-      return { before: [], after: captionIfShort(event.title) };
+      return { before: [], after: captionIfShort(leadingTitleSegment(event.title)) };
     case 'click':
       return { before: captionIfShort(event.label), after: [] };
     case 'input': {
@@ -72,6 +85,10 @@ function captionIfShort(text: string): Command[] {
   return [{ kind: 'caption', text: trimmed }];
 }
 
+function hasCaption(cs: Command[]): boolean {
+  return cs.some((c) => c.kind === 'caption');
+}
+
 export function buildScript(session: RecordedSession, options: BuildOptions = {}): Script {
   const { events, viewport } = session;
   if (events.length === 0 || events[0]!.type !== 'navigate') {
@@ -81,13 +98,21 @@ export function buildScript(session: RecordedSession, options: BuildOptions = {}
   const polish = options.polish ?? true;
   const commands: Command[] = [];
   let previousAt: number | undefined;
+  // Captions persist until replaced; only navigate and click ever emit one.
+  // Track whether one is currently on screen so an unrelated later action
+  // (e.g. a zoomed type after a click) doesn't inherit a stale caption.
+  let captionShowing = false;
 
   events.forEach((event, index) => {
     if (index === 0 && event.type === 'navigate') {
       commands.push({ kind: 'visit', url: event.url });
       commands.push({ kind: 'viewport', width: viewport.width, height: viewport.height });
       commands.push({ kind: 'wait', idle: true });
-      if (polish) commands.push(...polishEvent(event, viewport).after);
+      if (polish) {
+        const after = polishEvent(event, viewport).after;
+        commands.push(...after);
+        if (hasCaption(after)) captionShowing = true;
+      }
       previousAt = event.at;
       return;
     }
@@ -95,8 +120,17 @@ export function buildScript(session: RecordedSession, options: BuildOptions = {}
     if (previousAt !== undefined && event.type !== 'navigate') {
       commands.push({ kind: 'wait', ms: clampWait(event.at - previousAt) });
     }
-    const extras = polish ? polishEvent(event, viewport) : { before: [], after: [] };
-    commands.push(...extras.before, ...actionFor(event), ...extras.after);
+
+    if (polish) {
+      const extras = polishEvent(event, viewport);
+      const emitsCaption = hasCaption(extras.before) || hasCaption(extras.after);
+      const clearCaption: Command = { kind: 'caption', text: '' };
+      const before = emitsCaption || !captionShowing ? extras.before : [clearCaption, ...extras.before];
+      commands.push(...before, ...actionFor(event), ...extras.after);
+      captionShowing = emitsCaption;
+    } else {
+      commands.push(...actionFor(event));
+    }
     previousAt = event.at;
   });
 
