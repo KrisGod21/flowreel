@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { chromium, type Browser, type Page } from 'playwright';
 import { encodeOutput, assertSupported, scratchDirFor } from '../../src/encode/encode.js';
+import { renderFrameAssets } from '../../src/encode/frame.js';
+import { resolveBrowser, launchOptionsFor, systemProbe } from '../../src/browser/resolve.js';
 import { probeFfmpeg, ffmpegBinary, type FfmpegCapabilities } from '../../src/encode/probe.js';
 import { execFile } from 'node:child_process';
 import type { Frame } from '../../src/capture/types.js';
@@ -92,6 +95,67 @@ describe('encodeOutput', () => {
 
     // A valid file that missed its budget is reported, not thrown away.
     expect(result.bytes).toBeGreaterThan(1);
+    expect((await stat(out)).size).toBe(result.bytes);
+  });
+});
+
+describe('encodeOutput with framing', () => {
+  let browser: Browser;
+  let page: Page;
+
+  beforeAll(async () => {
+    const choice = await resolveBrowser(systemProbe);
+    browser = await chromium.launch({ ...launchOptionsFor(choice), headless: true });
+    page = await browser.newPage();
+  });
+
+  afterAll(async () => {
+    await browser?.close();
+  });
+
+  // The discriminating check: framing adds padding around the window, so the
+  // framed output must be wider than the requested width, while encoding the
+  // very same frames without a renderFrame factory must come out at exactly
+  // that width. If the two came out equal, framing did not actually apply.
+  it.skipIf(!caps.h264)('produces a canvas wider than the requested width, unlike an unframed encode', async () => {
+    const requestedWidth = 8; // matches the fixture JPEG's own native size
+
+    const unframedOut = resolve(SCRATCH, 'unframed.mp4');
+    await encodeOutput(frames(10, 15), { format: 'mp4', width: requestedWidth, fps: 15, maxBytes: 10_000_000 }, unframedOut);
+    expect(await videoSize(unframedOut)).toBe(`${requestedWidth}x${requestedWidth}`);
+
+    const framedOut = resolve(SCRATCH, 'framed.mp4');
+    const renderFrame = (width: number) =>
+      renderFrameAssets(page, { width, captureWidth: requestedWidth, captureHeight: requestedWidth });
+    const result = await encodeOutput(
+      frames(10, 15),
+      { format: 'mp4', width: requestedWidth, fps: 15, maxBytes: 10_000_000 },
+      framedOut,
+      renderFrame,
+    );
+
+    expect(result.bytes).toBeGreaterThan(0);
+    const size = await videoSize(framedOut);
+    const match = /^(\d+)x(\d+)/.exec(size);
+    expect(match).not.toBeNull();
+    const framedWidth = Number(match![1]);
+    expect(framedWidth).toBeGreaterThan(requestedWidth);
+  });
+
+  it.skipIf(!caps.gif)('still applies palettegen/paletteuse after the overlay for GIF', async () => {
+    const requestedWidth = 8;
+    const out = resolve(SCRATCH, 'framed.gif');
+    const renderFrame = (width: number) =>
+      renderFrameAssets(page, { width, captureWidth: requestedWidth, captureHeight: requestedWidth });
+
+    const result = await encodeOutput(
+      frames(10, 15),
+      { format: 'gif', width: requestedWidth, fps: 15, maxBytes: 5_000_000 },
+      out,
+      renderFrame,
+    );
+
+    expect(result.bytes).toBeGreaterThan(0);
     expect((await stat(out)).size).toBe(result.bytes);
   });
 });

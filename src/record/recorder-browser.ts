@@ -19,6 +19,7 @@ export const RECORDER_SOURCE = `
   // <summary> recorded the summary's label but the icon's tiny box.
   const CLICKABLE = 'button, a, [role="button"], input[type="submit"], input[type="button"], summary';
   const BUTTON_SELECTOR = 'button, input[type="submit"], input[type="button"], [role="button"]';
+  const LINK_SELECTOR = 'a[href]';
 
   const cssEscape = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : s;
 
@@ -53,13 +54,22 @@ export const RECORDER_SOURCE = `
   };
 
   // Bare text is only safe to emit when the resolver's own lookup strategy
-  // (getByRole('button', exact) for button-like things, getByText(exact)
-  // otherwise) would land on exactly one element - otherwise replay picks
-  // whichever match happens to come first in the DOM, which may not be this one.
+  // (getByRole('button', exact) for button-like things, getByRole('link', exact)
+  // for links, getByText(exact) otherwise) would land on exactly one element -
+  // otherwise replay picks whichever match happens to come first in the DOM,
+  // which may not be this one.
   const isButtonLike = (el) => el.matches(BUTTON_SELECTOR);
+  const isLinkLike = (el) => el.matches(LINK_SELECTOR);
 
   const countButtonMatches = (label) => {
     const all = document.querySelectorAll(BUTTON_SELECTOR);
+    let count = 0;
+    for (let i = 0; i < all.length; i++) if (shortText(all[i]) === label) count++;
+    return count;
+  };
+
+  const countLinkMatches = (label) => {
+    const all = document.querySelectorAll(LINK_SELECTOR);
     let count = 0;
     for (let i = 0; i < all.length; i++) if (shortText(all[i]) === label) count++;
     return count;
@@ -84,8 +94,14 @@ export const RECORDER_SOURCE = `
     return count;
   };
 
-  const isTextUnique = (clickable, label) =>
-    (isButtonLike(clickable) ? countButtonMatches(label) : countTextMatches(label)) === 1;
+  const isTextUnique = (clickable, label) => {
+    const count = isButtonLike(clickable)
+      ? countButtonMatches(label)
+      : isLinkLike(clickable)
+        ? countLinkMatches(label)
+        : countTextMatches(label);
+    return count === 1;
+  };
 
   const describe = (el) => {
     const clickable = el.closest(CLICKABLE);

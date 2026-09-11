@@ -1,0 +1,106 @@
+name: 'flowreel'
+description: 'Regenerate a flowreel demo GIF/MP4 and commit it back to the repo'
+author: 'Krishna Sharma'
+
+inputs:
+  script:
+    description: 'Path to the .reel script to run (relative to the repo root)'
+    required: true
+  start:
+    description: 'Optional command that starts the app before recording, e.g. "npm run dev"'
+    required: false
+    default: ''
+  url:
+    description: 'Optional URL to wait for before recording starts, e.g. "http://localhost:3000"'
+    required: false
+    default: ''
+  commit:
+    description: 'Whether to commit and push the regenerated demo files. Set to "false" to skip.'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        echo "Checking for a lockfile"
+        if [ -f package-lock.json ]; then
+          echo "Found package-lock.json, running npm ci"
+          npm ci
+        else
+          echo "No package-lock.json found, skipping npm ci"
+        fi
+
+    - name: Start the app
+      if: ${{ inputs.start != '' }}
+      shell: bash
+      run: |
+        echo "Starting the app in the background: ${{ inputs.start }}"
+        nohup ${{ inputs.start }} > flowreel-start.log 2>&1 &
+        echo "App start command launched, continuing without waiting for it to exit"
+
+    - name: Wait for the app to respond
+      if: ${{ inputs.url != '' }}
+      shell: bash
+      run: |
+        echo "Waiting up to 60 seconds for ${{ inputs.url }} to respond"
+        i=0
+        while [ "$i" -lt 60 ]; do
+          if curl --silent --fail --output /dev/null "${{ inputs.url }}"; then
+            echo "The app responded after $i seconds"
+            exit 0
+          fi
+          i=$((i + 1))
+          sleep 1
+        done
+        echo "Timed out after 60 seconds waiting for ${{ inputs.url }} to respond"
+        exit 1
+
+    - name: Install Playwright Chromium
+      shell: bash
+      run: |
+        echo "Installing Playwright's Chromium browser"
+        npx playwright install --with-deps chromium
+
+    - name: Run flowreel
+      shell: bash
+      run: |
+        echo "Running flowreel on ${{ inputs.script }}"
+        SCRIPT_DIR=$(dirname "${{ inputs.script }}")
+        SCRIPT_FILE=$(basename "${{ inputs.script }}")
+        echo "Recording from directory: $SCRIPT_DIR"
+        cd "$SCRIPT_DIR"
+        npx flowreel "$SCRIPT_FILE"
+
+    - name: Commit regenerated demo files
+      if: ${{ inputs.commit == 'true' }}
+      shell: bash
+      run: |
+        echo "Looking for changed demo files next to the script"
+        SCRIPT_DIR=$(dirname "${{ inputs.script }}")
+        git config user.name "${{ github.actor }}"
+        git config user.email "${{ github.actor }}@users.noreply.github.com"
+        shopt -s nullglob
+        FILES=("$SCRIPT_DIR"/*.gif "$SCRIPT_DIR"/*.mp4 "$SCRIPT_DIR"/*.webp)
+        if [ ${#FILES[@]} -eq 0 ]; then
+          echo "No .gif, .mp4, or .webp files found next to the script, nothing to commit"
+          exit 0
+        fi
+        git add "${FILES[@]}"
+        if git diff --cached --quiet; then
+          echo "No changes to the demo files, nothing to commit"
+        else
+          echo "Changes found, committing and pushing"
+          git commit -m "chore: regenerate demo"
+          git push
+        fi

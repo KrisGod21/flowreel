@@ -17,7 +17,7 @@
 
 Every project needs a demo animation - for the README, the hackathon submission, the pull request, the launch post. Making one today means a screen recorder, a jerky real cursor, a 40&nbsp;MB file that breaks GitHub's size limit, and redoing the whole thing every time the UI changes.
 
-flowreel replaces that with a short, readable script. It drives a real browser, draws a **synthetic cursor** that glides between targets, marks clicks with a **ripple**, shows what it typed in a **keystroke chip**, burns in **captions**, and can **zoom** or **highlight** so small text stays legible once your animation is scaled down to README width. Then it encodes the result under a byte budget so it actually fits where it's going.
+flowreel replaces that with a short, readable script. It drives a real browser, draws a **synthetic cursor** that glides between targets, marks clicks with a **ripple**, shows what it typed in a **keystroke chip**, burns in **captions**, can **zoom** or **highlight** so small text stays legible once your animation is scaled down to README width, and wraps the whole thing in a **frame** with rounded corners, a soft shadow and a gradient backdrop. Then it encodes the result under a byte budget so it actually fits where it's going.
 
 - **No account, no API key, no server.** It runs on your machine and talks only to your app.
 - **Uses the Chrome or Edge you already have.** No 150&nbsp;MB browser download on first run.
@@ -32,6 +32,8 @@ npx flowreel record http://localhost:3000
 
 A browser opens. Click through the feature you want to show, type what you'd type, and press **Stop recording**. flowreel writes `demo.reel` (the script that reproduces what you did, with captions and zooms added), then renders `demo.gif` and `demo.mp4` from it.
 
+Not sure what to run? Just type `npx flowreel` with nothing after it: it finds your dev server on the usual ports and tells you the exact command. `npx flowreel --help` lists everything.
+
 Don't like a caption? Edit `demo.reel` and re-run it:
 
 ```bash
@@ -43,6 +45,7 @@ Or write a script by hand from the start. With a `demo.reel` like this:
 ```
 visit http://localhost:3000
 viewport 1280x800
+frame window
 wait idle
 
 caption "Sign in with one click"
@@ -91,6 +94,7 @@ A script is one command per line. Targets are **visible text first** - `click "S
 | `zoom <target>` / `reset zoom` | zoom toward an element and back |
 | `highlight <target>` / `reset highlight` | ring an element and dim the rest |
 | `theme light\|dark` | emulate a color scheme |
+| `frame window` / `frame none` | rounded corners, drop shadow and a gradient backdrop around the recording |
 | `output <name> [--preset <p>]` | write the files |
 
 `output demo` writes the whole bundle for the preset. `output demo.gif` with an explicit extension writes just that one file.
@@ -123,6 +127,20 @@ The tradeoff: it records a browser tab flowreel opens, not your whole screen or 
 
 Because it's the only format that autoplays inline in a GitHub README from a file in your own repo. MP4 and WebM have to be uploaded through GitHub's web editor, live outside your repository, and don't loop - which also means a CI job can't regenerate them. GIF is a bad format and flowreel treats it as one: palette-optimised, budgeted, and paired with an MP4 for everywhere else.
 
+## Keep the demo fresh with GitHub Actions
+
+Add the action and your demo regenerates on every push, so the README never shows a stale UI:
+
+```yaml
+- uses: KrisGod21/flowreel@main
+  with:
+    script: demo/demo.reel
+    start: npm run dev            # optional: starts your app first
+    url: http://localhost:3000    # optional: waited on before recording
+```
+
+It commits the regenerated files back. Inputs, caching and the one caveat (CI runners download Chromium each run unless you cache it) are in [docs/github-action.md](docs/github-action.md).
+
 ## Regenerating this README's demo
 
 The animation at the top is produced by the tool itself, from [`demo/demo.reel`](demo/demo.reel) against [`demo/app.html`](demo/app.html):
@@ -134,10 +152,11 @@ npm run demo
 
 ## Status
 
-**v0.1 - early, working, and used to make its own README.** The scripting, capture, polish layer, `flowreel record`, and encoder are complete and tested (200+ tests, run against a real browser and real ffmpeg). Auto-polish is deterministic: zoom on narrow inputs, captions from your app's own button labels and page titles. No API key. What's next:
+**v0.2 - working, tested against a real browser and real ffmpeg, and used to make its own README.** Recording, the polish layer, framing, the encoder and the GitHub Action are all in. Two hundred-plus tests.
 
-- **Framing** - browser chrome, device frames, rounded corners and a backdrop.
-- **A GitHub Action** that regenerates your demo on every release, so the README never shows a stale UI.
+What's next:
+
+- **Device frames** (a phone or laptop bezel) on top of the window frame.
 - **Animated WebP** for the README once its rendering on npm's package page is verified - it's ~5x smaller than GIF at full colour, and it already renders on GitHub.
 
 Design notes and every decision taken along the way live in [`docs/`](docs/).

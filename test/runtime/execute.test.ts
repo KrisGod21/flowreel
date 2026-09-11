@@ -37,6 +37,16 @@ describe('executeScript', () => {
     expect(await page.locator('#email').inputValue()).toBe('demo@example.com');
   });
 
+  // demo/app.html has both a nav <a>Overview</a> and an <h1>Overview</h1>, so
+  // getByText(exact) alone is ambiguous. resolveTarget must try getByRole
+  // ('link', exact) before falling to text, landing on the link (a heading is
+  // not a link), not whichever of the two happens to match text-matching first.
+  it('resolves a link target by role before falling back to ambiguous text matching', async () => {
+    await page.goto(pathToFileURL(resolve('demo/app.html')).href);
+    const locator = await resolveTarget(page, 'Overview');
+    expect(await locator.evaluate((el) => el.tagName)).toBe('A');
+  });
+
   it('resolves a CSS-selector target to the visible match, not a hidden decoy that matches first', async () => {
     await page.goto(FIXTURE);
     // .cta matches both #hidden-cta (display: none, first in document order) and

@@ -114,6 +114,14 @@ function parseLine(tokens: string[], line: number): Command {
       return { kind: 'theme', mode };
     }
 
+    case 'frame': {
+      const style = need(tokens, 1, line, 'window or none');
+      if (style !== 'window' && style !== 'none') {
+        throw new ReelParseError(line, `frame must be window or none, got "${style}"`);
+      }
+      return { kind: 'frame', style };
+    }
+
     case 'output': {
       const name = need(tokens, 1, line, 'an output name');
       const flagIndex = tokens.indexOf('--preset');

@@ -114,6 +114,7 @@ export function buildScript(session: RecordedSession, options: BuildOptions = {}
     if (index === 0 && event.type === 'navigate') {
       commands.push({ kind: 'visit', url: event.url });
       commands.push({ kind: 'viewport', width: viewport.width, height: viewport.height });
+      if (polish) commands.push({ kind: 'frame', style: 'window' });
       commands.push({ kind: 'wait', idle: true });
       if (polish) {
         const after = polishEvent(event, viewport).after;

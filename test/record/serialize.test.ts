@@ -35,6 +35,7 @@ describe('serialize', () => {
       { kind: 'highlight', target: 'New project' },
       { kind: 'resetHighlight' },
       { kind: 'theme', mode: 'dark' },
+      { kind: 'frame', style: 'window' },
       { kind: 'caption', text: '' },
       { kind: 'output', name: 'demo', preset: 'twitter' },
     ],

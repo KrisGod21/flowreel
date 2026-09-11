@@ -19,6 +19,7 @@ export type Command =
   | { kind: 'resetHighlight' }
   | { kind: 'caption'; text: string }
   | { kind: 'theme'; mode: 'light' | 'dark' }
+  | { kind: 'frame'; style: 'window' | 'none' }
   | { kind: 'output'; name: string; preset?: string };
 
 export interface Script {

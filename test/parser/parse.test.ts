@@ -22,6 +22,7 @@ describe('parse', () => {
       'highlight ".cta"',
       'caption "One command, zero setup"',
       'theme dark',
+      'frame window',
       'output demo',
     ].join('\n');
 
@@ -42,8 +43,17 @@ describe('parse', () => {
       { kind: 'highlight', target: '.cta' },
       { kind: 'caption', text: 'One command, zero setup' },
       { kind: 'theme', mode: 'dark' },
+      { kind: 'frame', style: 'window' },
       { kind: 'output', name: 'demo' },
     ]);
+  });
+
+  it('parses "frame none"', () => {
+    expect(parse('frame none').commands).toEqual([{ kind: 'frame', style: 'none' }]);
+  });
+
+  it('rejects an unknown frame style in plain language', () => {
+    expect(() => parse('frame sideways')).toThrow(/frame must be window or none/i);
   });
 
   it('parses an output line with a preset', () => {

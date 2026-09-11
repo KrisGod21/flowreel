@@ -1,6 +1,6 @@
 {
   "name": "flowreel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Record a polished demo of your web app by describing it. One script in, a README GIF and an MP4 out.",
   "keywords": [
     "demo",

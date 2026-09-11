@@ -53,6 +53,7 @@ export async function resolveTarget(
     // target that appears mid-poll be found.
     const candidates: Locator[] = [
       page.getByRole('button', { name: target, exact: true }),
+      page.getByRole('link', { name: target, exact: true }),
       page.getByText(target, { exact: true }),
       page.locator(target),
     ];

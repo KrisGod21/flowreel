@@ -91,6 +91,19 @@ describe('runScript', () => {
     expect(await videoSize(outputs[0]!.path)).toBe('1000x700');
   });
 
+  it('produces an MP4 wider than the viewport width when the script asks for a frame', async () => {
+    const outputs = await runScript(
+      [`visit ${FIXTURE}`, 'viewport 400x300', 'frame window', 'wait 400', 'output framed'].join('\n'),
+      { cwd: SCRATCH, presetOverride: 'twitter' },
+    );
+
+    expect(outputs.map((o) => o.format)).toEqual(['mp4']);
+    const size = await videoSize(outputs[0]!.path);
+    const match = /^(\d+)x(\d+)/.exec(size);
+    expect(match).not.toBeNull();
+    expect(Number(match![1])).toBeGreaterThan(400);
+  });
+
   // An explicit extension overrides the preset's format choice: one file,
   // named exactly what the user asked for, with no doubled extension.
   it('emits exactly one file when the output name carries an extension', async () => {

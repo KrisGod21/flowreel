@@ -12,7 +12,10 @@ function session(events: InteractionEvent[]): RecordedSession {
 
 describe('buildScript (raw)', () => {
   it('opens with visit, viewport and wait idle', () => {
-    const script = buildScript(session([{ type: 'navigate', url: 'http://x/', title: 'X', at: 0 }]));
+    const script = buildScript(
+      session([{ type: 'navigate', url: 'http://x/', title: 'X', at: 0 }]),
+      { polish: false },
+    );
     expect(script.commands.slice(0, 3)).toEqual([
       { kind: 'visit', url: 'http://x/' },
       { kind: 'viewport', width: 1280, height: 800 },
@@ -102,6 +105,15 @@ describe('buildScript (raw)', () => {
 describe('buildScript (polish)', () => {
   const small = { x: 300, y: 200, width: 320, height: 36 };
   const wide = { x: 0, y: 200, width: 1100, height: 36 };
+
+  it('emits frame window right after the opening viewport line', () => {
+    const script = buildScript(session([{ type: 'navigate', url: 'http://x/', title: 'X', at: 0 }]));
+    expect(script.commands.slice(0, 3)).toEqual([
+      { kind: 'visit', url: 'http://x/' },
+      { kind: 'viewport', width: 1280, height: 800 },
+      { kind: 'frame', style: 'window' },
+    ]);
+  });
 
   it('is the default', () => {
     const script = buildScript(

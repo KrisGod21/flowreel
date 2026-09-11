@@ -8,7 +8,8 @@ import { executeScript, visit } from './runtime/execute.js';
 import { startScreencast } from './capture/screencast.js';
 import { Overlay } from './overlay/api.js';
 import { trimIdle } from './capture/trim.js';
-import { encodeOutput } from './encode/encode.js';
+import { encodeOutput, type RenderFrame } from './encode/encode.js';
+import { renderFrameAssets } from './encode/frame.js';
 import { PRESETS } from './encode/presets.js';
 import type { OutputFormat, OutputSpec, Preset } from './encode/presets.js';
 import { UserError } from './errors.js';
@@ -94,6 +95,15 @@ export function planOutputs(name: string, preset: Preset): PlannedOutput[] {
 export function initialViewport(script: Script): { width: number; height: number } | undefined {
   const command = script.commands.find((c) => c.kind === 'viewport');
   return command?.kind === 'viewport' ? { width: command.width, height: command.height } : undefined;
+}
+
+// Reads the *last* `frame` command in the script, matching how `output`'s
+// name and preset are resolved - a later line wins, so a script can flip
+// framing back off after an earlier `frame window`.
+export function wantsFrame(script: Script): boolean {
+  const commands = script.commands.filter((c) => c.kind === 'frame');
+  const last = commands.at(-1);
+  return last?.kind === 'frame' && last.style === 'window';
 }
 
 // The screencast is started before the script runs (see startScreencast's own
@@ -182,10 +192,27 @@ export async function runScript(source: string, options: RunOptions): Promise<Em
     const frames = trimIdle(frameSet.frames, IDLE_THRESHOLD_MS);
     assertFramesCaptured(frames);
 
+    // The screencast has already been stopped (captureFrames awaited its
+    // stop()), so reusing `page` here to render the frame stills does not
+    // touch anything that could still land in the recording. The planned
+    // outputs below encode concurrently (Promise.all), and each can call
+    // renderFrame at its own width - queued so they still take turns on the
+    // one shared `page` instead of one call's setContent racing another's.
+    let frameQueue: Promise<unknown> = Promise.resolve();
+    const renderFrame: RenderFrame | undefined = wantsFrame(script)
+      ? (width: number) => {
+          const result = frameQueue.then(
+            () => renderFrameAssets(page, { width, captureWidth: frameSet.width, captureHeight: frameSet.height }),
+          );
+          frameQueue = result.catch(() => {});
+          return result;
+        }
+      : undefined;
+
     return await Promise.all(
       planned.map(async ({ spec, fileName }): Promise<EmittedOutput> => {
         const outPath = resolve(options.cwd, fileName);
-        const result = await encodeOutput(frames, spec, outPath);
+        const result = await encodeOutput(frames, spec, outPath, renderFrame);
         return {
           path: result.path,
           bytes: result.bytes,

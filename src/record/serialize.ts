@@ -40,6 +40,8 @@ function line(command: Command): string {
       return `caption ${quote(command.text)}`;
     case 'theme':
       return `theme ${command.mode}`;
+    case 'frame':
+      return `frame ${command.style}`;
     case 'output':
       return command.preset === undefined
         ? `output ${quote(command.name)}`

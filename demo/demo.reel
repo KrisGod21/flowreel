@@ -3,6 +3,7 @@
 
 visit __APP__
 viewport 1280x800
+frame window
 wait idle
 
 caption "Describe the demo. flowreel records it."

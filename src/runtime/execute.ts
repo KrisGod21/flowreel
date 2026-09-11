@@ -203,6 +203,11 @@ async function runCommand(page: Page, command: Command, overlay?: Overlay): Prom
       if (overlay) await overlay.caption(command.text);
       return;
 
+    case 'frame':
+      // Encode-time setting, read by run.ts - nothing to do while executing
+      // the script against the live page.
+      return;
+
     case 'output':
       return;
   }

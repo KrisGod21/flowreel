@@ -42,11 +42,23 @@ describe('selector generation', () => {
     expect(await describeEl('#new-project')).toEqual({ target: 'New project', label: 'New project' });
   });
 
-  // demo/app.html already has an <h1>Overview</h1>, so the nav link's own text
-  // is not actually unique on the page - it only used to "work" because the
-  // nav happens to come before the h1 in DOM order, which is exactly the kind
-  // of luck a text-first selector must not depend on.
-  it('falls back to a unique selector for a link whose text collides elsewhere on the page', async () => {
+  // demo/app.html has an <h1>Overview</h1> alongside the nav link, but the
+  // resolver now checks link-uniqueness (getByRole('link', exact)) before
+  // falling through to bare-text matching, and the h1 is not a link - so the
+  // nav link's own text is unique *among links* and can be emitted as-is.
+  it('emits bare text for a link whose text is unique among links, even though a non-link element shares it', async () => {
+    const d = await describeEl('nav a.active');
+    expect(d).toEqual({ target: 'Overview', label: 'Overview' });
+  });
+
+  it('falls back to a unique selector for a link whose text collides with another link', async () => {
+    await page.evaluate(() => {
+      const dup = document.createElement('a');
+      dup.href = '#';
+      dup.textContent = 'Overview';
+      document.body.appendChild(dup);
+    });
+
     const d = await describeEl('nav a.active');
     expect(d.label).toBe('Overview');
     expect(d.target).not.toBe('Overview');
